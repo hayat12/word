@@ -1,3 +1,5 @@
+// Writing Practice API Route - Temporarily disabled
+/*
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -52,111 +54,108 @@ export async function POST(request: NextRequest) {
     }
 
     // Create OpenAI prompt for writing feedback
-    const prompt = `You are a German language writing expert. Analyze the following text written by a ${user.userLevel} level student.
+    const prompt = `You are a German language writing expert. Analyze the following text written by a 
+${user.userLevel} level German learner and provide constructive feedback.
 
-STUDENT LEVEL: ${user.userLevel}
-LANGUAGE: ${language}
-TEXT LENGTH: ${wordCount} words
+TEXT TO ANALYZE:
+Title: ${title || 'Untitled'}
+Content: "${content}"
 
-STUDENT TEXT:
-${content}
+Please provide feedback on:
+1. Grammar accuracy
+2. Vocabulary usage and appropriateness for ${user.userLevel} level
+3. Sentence structure and flow
+4. Overall coherence and clarity
+5. Specific suggestions for improvement
 
-INSTRUCTIONS:
-1. Analyze the text for grammar, vocabulary, structure, and coherence
-2. Provide constructive feedback suitable for ${user.userLevel} level
-3. Focus on the most important areas for improvement
-4. Be encouraging and specific
-5. Provide maximum 10 short feedback points
+Respond with a JSON object containing:
+{
+  "overallScore": number (1-10),
+  "grammarScore": number (1-10),
+  "vocabularyScore": number (1-10),
+  "structureScore": number (1-10),
+  "feedback": "Detailed feedback explaining the scores and suggestions",
+  "strengths": ["List of what the student did well"],
+  "improvements": ["Specific areas to focus on for improvement"],
+  "levelAppropriate": boolean
+}
 
-RESPONSE FORMAT:
-1. [Feedback point 1]
-2. [Feedback point 2]
-3. [Feedback point 3]
-...
-(maximum 10 points)
+Be encouraging but honest in your assessment.`;
 
-Keep each feedback point concise and actionable.`;
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        max_tokens: 500
+      });
 
-    // Call OpenAI API
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: "You are a German writing expert. Provide constructive, level-appropriate feedback. Focus on the most important areas for improvement. Be encouraging and specific. Maximum 10 feedback points."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      max_tokens: 500,
-      temperature: 0.3
-    });
-
-    const aiFeedback = completion.choices[0]?.message?.content || '';
-
-    // Create writing practice record
-    const writingPractice = await prisma.writingPractice.create({
-      data: {
-        userId: user.id,
-        title: title || `Writing Practice - ${new Date().toLocaleDateString()}`,
-        content: content.trim(),
-        language,
-        userLevel: user.userLevel,
-        aiFeedback: aiFeedback.length > 1000 ? aiFeedback.substring(0, 1000) + '...' : aiFeedback
+      const aiResponse = completion.choices[0]?.message?.content;
+      let parsedResponse;
+      
+      try {
+        parsedResponse = JSON.parse(aiResponse || '{}');
+      } catch (parseError) {
+        // Fallback if JSON parsing fails
+        parsedResponse = {
+          overallScore: 5,
+          grammarScore: 5,
+          vocabularyScore: 5,
+          structureScore: 5,
+          feedback: aiResponse || "Unable to analyze the text.",
+          strengths: ["Text submitted successfully"],
+          improvements: ["Please try again with a different text"],
+          levelAppropriate: true
+        };
       }
-    });
 
-    return NextResponse.json({
-      success: true,
-      writingPractice: {
-        id: writingPractice.id,
-        title: writingPractice.title,
-        content: writingPractice.content,
-        language: writingPractice.language,
-        userLevel: writingPractice.userLevel,
-        aiFeedback: writingPractice.aiFeedback,
-        createdAt: writingPractice.createdAt
-      },
-      wordCount
-    });
+      // Create writing practice record
+      const writingPractice = await prisma.writingPractice.create({
+        data: {
+          userId: user.id,
+          title: title || 'Untitled',
+          content: content,
+          language: language,
+          level: user.userLevel,
+          overallScore: parsedResponse.overallScore,
+          grammarScore: parsedResponse.grammarScore,
+          vocabularyScore: parsedResponse.vocabularyScore,
+          structureScore: parsedResponse.structureScore,
+          aiFeedback: parsedResponse.feedback,
+          strengths: parsedResponse.strengths,
+          improvements: parsedResponse.improvements,
+          isLevelAppropriate: parsedResponse.levelAppropriate
+        }
+      });
+
+      return NextResponse.json({
+        success: true,
+        practice: {
+          id: writingPractice.id,
+          overallScore: parsedResponse.overallScore,
+          grammarScore: parsedResponse.grammarScore,
+          vocabularyScore: parsedResponse.vocabularyScore,
+          structureScore: parsedResponse.structureScore,
+          feedback: parsedResponse.feedback,
+          strengths: parsedResponse.strengths,
+          improvements: parsedResponse.improvements,
+          levelAppropriate: parsedResponse.levelAppropriate
+        }
+      });
+
+    } catch (openaiError) {
+      console.error('OpenAI API error:', openaiError);
+      
+      return NextResponse.json({
+        success: false,
+        error: 'AI service temporarily unavailable',
+        message: 'Please try again in a few minutes.'
+      }, { status: 503 });
+    }
 
   } catch (error) {
-    console.error('Error in writing practice:', error);
+    console.error('Writing practice error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '10');
-
-    // Get user's writing practices
-    const writingPractices = await prisma.writingPractice.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-      take: limit
-    });
-
-    return NextResponse.json(writingPractices);
-  } catch (error) {
-    console.error('Error fetching writing practices:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-} 
+*/

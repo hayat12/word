@@ -498,8 +498,8 @@ export default function Dashboard() {
                   </Typography>
 
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {/* Grammar Practice Requirement */}
-                    <Box sx={{ 
+                    {/* Grammar Practice Requirement - Temporarily disabled */}
+                    {/* <Box sx={{ 
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'space-between',
@@ -578,7 +578,7 @@ export default function Dashboard() {
                       >
                         Practice Now
                       </Button>
-                    </Box>
+                    </Box> */}
 
                     {/* Vocabulary Practice Requirement */}
                     <Box sx={{ 
@@ -662,8 +662,8 @@ export default function Dashboard() {
                       </Button>
                     </Box>
 
-                    {/* Writing Practice Requirement (for B1+) */}
-                    {['B1', 'B2', 'C1', 'C2'].includes(userLevel) && (
+                    {/* Writing Practice Requirement (for B1+) - Temporarily disabled */}
+                    {/* {['B1', 'B2', 'C1', 'C2'].includes(userLevel) && (
                       <Box sx={{ 
                         display: 'flex', 
                         alignItems: 'center', 
@@ -744,7 +744,7 @@ export default function Dashboard() {
                           Write Now
                         </Button>
                       </Box>
-                    )}
+                    )} */}
 
                     {/* Daily Goal Requirement */}
                     <Box sx={{ 
@@ -1089,7 +1089,8 @@ export default function Dashboard() {
                 >
                   Begin with A1 level to unlock your language learning progress!
                 </Typography>
-                <Button
+                {/* Start Learning Button - Temporarily disabled */}
+                {/* <Button
                   variant="contained"
                   onClick={() => router.push('/practice/grammar')}
                   sx={{ 
@@ -1099,7 +1100,7 @@ export default function Dashboard() {
                   }}
                 >
                   Start Learning
-                </Button>
+                </Button> */}
               </Box>
             </Card>
           )}

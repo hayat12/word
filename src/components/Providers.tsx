@@ -5,7 +5,7 @@ import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import { lightTheme } from "@/lib/theme";
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { Session } from "next-auth";
 
 interface ProvidersProps {
@@ -14,7 +14,15 @@ interface ProvidersProps {
 }
 
 export default function Providers({ children, session }: ProvidersProps) {
-  const queryClient = new QueryClient();
+  // Create QueryClient only once to prevent hydration issues
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 60 * 1000, // 1 minute
+        refetchOnWindowFocus: false,
+      },
+    },
+  }));
 
   return (
     <SessionProvider session={session}>

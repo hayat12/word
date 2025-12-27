@@ -34,13 +34,13 @@ export default function SignIn() {
       const result = await signIn("credentials", {
         email,
         password,
-        redirect: false,
+        redirect: true,
+        callbackUrl: "/",
       });
 
+      // If we get here, there was an error (successful login redirects)
       if (result?.error) {
         setError("Invalid email or password. Please try again.");
-      } else if (result?.ok) {
-        router.push("/");
       }
     } catch (error) {
       setError("An error occurred. Please try again.");
@@ -56,13 +56,12 @@ export default function SignIn() {
     try {
       const result = await signIn("google", {
         callbackUrl: "/",
-        redirect: false,
+        redirect: true,
       });
 
+      // If we get here, there was an error (successful login redirects)
       if (result?.error) {
         setError("Failed to sign in with Google. Please try again.");
-      } else if (result?.ok) {
-        router.push("/");
       }
     } catch (error) {
       setError("An error occurred. Please try again.");

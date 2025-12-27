@@ -1,3 +1,5 @@
+// Writing Practice Page - Temporarily disabled
+/*
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -49,28 +51,23 @@ export default function WritingPracticePage() {
   const [writingHistory, setWritingHistory] = useState<WritingPractice[]>([]);
   const [wordCount, setWordCount] = useState(0);
   const [userLevel, setUserLevel] = useState<string>('A1');
+  const [isEligible, setIsEligible] = useState(false);
 
   useEffect(() => {
-    fetchWritingHistory();
     fetchUserLevel();
   }, []);
+
+  useEffect(() => {
+    if (userLevel) {
+      checkEligibility();
+      fetchWritingHistory();
+    }
+  }, [userLevel]);
 
   useEffect(() => {
     const count = content.trim().split(/\s+/).filter(word => word.length > 0).length;
     setWordCount(count);
   }, [content]);
-
-  const fetchWritingHistory = async () => {
-    try {
-      const response = await fetch('/api/writing/practice');
-      if (response.ok) {
-        const history = await response.json();
-        setWritingHistory(history);
-      }
-    } catch (error) {
-      console.error('Error fetching writing history:', error);
-    }
-  };
 
   const fetchUserLevel = async () => {
     try {
@@ -84,8 +81,27 @@ export default function WritingPracticePage() {
     }
   };
 
+  const checkEligibility = () => {
+    const allowedLevels = ['B1', 'B2', 'C1', 'C2'];
+    setIsEligible(allowedLevels.includes(userLevel));
+  };
+
+  const fetchWritingHistory = async () => {
+    try {
+      const response = await fetch('/api/writing/practice');
+      if (response.ok) {
+        const history = await response.json();
+        setWritingHistory(history);
+      }
+    } catch (error) {
+      console.error('Error fetching writing history:', error);
+    }
+  };
+
   const handleSubmit = async () => {
-    if (!content.trim()) return;
+    if (!content.trim()) {
+      return;
+    }
 
     setIsLoading(true);
     setFeedback(null);
@@ -97,7 +113,7 @@ export default function WritingPracticePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: title.trim() || undefined,
+          title: title.trim() || 'Untitled',
           content: content.trim(),
           language: 'German'
         }),
@@ -106,369 +122,469 @@ export default function WritingPracticePage() {
       const result = await response.json();
 
       if (response.ok) {
-        setFeedback(result.writingPractice.aiFeedback);
+        setFeedback(result.practice.feedback);
+        
+        // Refresh writing history
+        fetchWritingHistory();
+        
+        // Clear form for next submission
         setTitle('');
         setContent('');
-        fetchWritingHistory(); // Refresh history
       } else {
-        setFeedback(`Error: ${result.error}`);
+        setFeedback(result.error || 'An error occurred. Please try again.');
       }
     } catch (error) {
-      setFeedback('Network error occurred');
+      console.error('Error submitting writing practice:', error);
+      setFeedback('Network error occurred. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const isB1OrAbove = ['B1', 'B2', 'C1', 'C2'].includes(userLevel);
-
   if (!session) {
     return (
-      <Box sx={{ minHeight: '100vh', bgcolor: '#f4f5f7' }}>
-        <Container maxWidth="sm" sx={{ py: { xs: 2, md: 4 } }}>
-          <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-            <Alert severity="info" sx={{ width: '100%' }}>
-              Please sign in to access writing practice.
-            </Alert>
-          </Box>
-        </Container>
-      </Box>
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Card>
+          <CardContent sx={{ textAlign: 'center', py: 6 }}>
+            <Typography variant="h5" gutterBottom>
+              Please sign in to access writing practice
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              You need to be logged in to practice German writing.
+            </Typography>
+          </CardContent>
+        </Card>
+      </Container>
     );
   }
 
-  if (!isB1OrAbove) {
+  if (!isEligible) {
     return (
-      <Box sx={{ minHeight: '100vh', bgcolor: '#f4f5f7' }}>
-        <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
-          <Box sx={{ mb: 4 }}>
-            <Typography 
-              variant="h4" 
-              component="h1" 
-              gutterBottom 
-              sx={{ 
-                fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
-                fontWeight: 700, 
-                color: '#172b4d',
-                mb: 1
-              }}
-            >
-              Writing Practice
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Card>
+          <CardContent sx={{ textAlign: 'center', py: 6 }}>
+            <Warning sx={{ fontSize: 60, color: '#f57c00', mb: 2 }} />
+            <Typography variant="h5" gutterBottom>
+              Writing Practice Not Available
             </Typography>
-            <Typography 
-              variant="body1" 
-              color="text.secondary"
-              sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
-            >
-              Practice German writing with AI-powered feedback
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+              Writing practice is only available for B1 level and above.
             </Typography>
-          </Box>
-
-          <Card sx={{ 
-            bgcolor: 'white',
-            borderRadius: 0.5,
-            border: '1px solid #dfe1e6',
-            boxShadow: '0 1px 3px rgba(9, 30, 66, 0.13)',
-            '&:hover': {
-              boxShadow: '0 2px 6px rgba(9, 30, 66, 0.15)',
-            }
-          }}>
-            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-              <Alert severity="warning" icon={<Warning />}>
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  Writing practice is only available for B1 level and above
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                  <Typography variant="body2">
-                    Your current level:
-                  </Typography>
-                  <Chip label={userLevel} color="primary" size="small" />
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                  <Typography variant="body2">
-                    Required level:
-                  </Typography>
-                  <Chip label="B1" color="success" size="small" />
-                </Box>
-              </Alert>
-            </CardContent>
-          </Card>
-        </Container>
-      </Box>
+            <Typography variant="body2" color="text.secondary">
+              Your current level: <strong>{userLevel}</strong>
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Required level: <strong>B1</strong>
+            </Typography>
+          </CardContent>
+        </Card>
+      </Container>
     );
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#f4f5f7' }}>
-      <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
-        
-        {/* Header Section */}
-        <Box sx={{ mb: 4 }}>
-          <Typography 
-            variant="h4" 
-            component="h1" 
-            gutterBottom 
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      {/* Header */}
+      <Box sx={{ mb: 4 }}>
+        <Typography 
+          variant="h4" 
+          sx={{ 
+            fontWeight: 700,
+            color: '#172b4d',
+            mb: 1,
+            fontSize: { xs: '1.75rem', sm: '2.125rem' }
+          }}
+        >
+          Writing Practice
+        </Typography>
+        <Typography 
+          variant="body1" 
+          sx={{ 
+            color: '#6b778c',
+            fontSize: { xs: '1rem', sm: '1.125rem' }
+          }}
+        >
+          Practice German writing with AI-powered feedback. Write texts and get detailed analysis on grammar, vocabulary, and structure.
+        </Typography>
+        <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <Chip 
+            label={`Current Level: ${userLevel}`} 
+            color="primary" 
+            size="small"
             sx={{ 
-              fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
-              fontWeight: 700, 
-              color: '#172b4d',
-              mb: 1
-            }}
-          >
-            Writing Practice
-          </Typography>
-          <Typography 
-            variant="body1" 
-            color="text.secondary"
-            sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
-          >
-            Practice German writing with AI-powered feedback (B1+ level)
-          </Typography>
-        </Box>
-
-        <Grid container spacing={3}>
-          {/* Writing Area */}
-          <Grid item xs={12} lg={8}>
-            <Card sx={{ 
-              bgcolor: 'white',
               borderRadius: 0.5,
-              border: '1px solid #dfe1e6',
-              boxShadow: '0 1px 3px rgba(9, 30, 66, 0.13)',
-              '&:hover': {
-                boxShadow: '0 2px 6px rgba(9, 30, 66, 0.15)',
-              }
-            }}>
-              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-                  <Edit sx={{ color: '#0052cc', fontSize: 20 }} />
-                  <Typography 
-                    variant="h6" 
-                    sx={{ 
-                      fontWeight: 600, 
-                      color: '#172b4d',
-                      fontSize: { xs: '1rem', sm: '1.125rem' }
-                    }}
-                  >
-                    Write Your Text
-                  </Typography>
-                </Box>
-                
-                <Box sx={{ mb: 3 }}>
-                  <TextField
-                    fullWidth
-                    label="Title (optional)"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Enter a title for your writing..."
-                    variant="outlined"
-                    size="small"
-                    sx={{ 
-                      mb: 2,
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 0.5,
-                      }
-                    }}
-                  />
-                  
-                  <TextField
-                    fullWidth
-                    multiline
-                    rows={isMobile ? 6 : 8}
-                    label="Your text (max 250 words)"
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder="Write your German text here..."
-                    variant="outlined"
-                    disabled={isLoading}
-                    inputProps={{ maxLength: 2000 }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 0.5,
-                      }
-                    }}
-                  />
-                  
-                  <Box sx={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center', 
-                    mt: 1,
-                    flexWrap: 'wrap',
-                    gap: 1
-                  }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Word count: {wordCount}/250
-                    </Typography>
-                    <Chip 
-                      label={`Level ${userLevel}`} 
-                      color="primary" 
-                      size="small"
-                      sx={{ borderRadius: 0.5 }}
-                    />
-                  </Box>
-                </Box>
+              fontSize: '0.75rem',
+              fontWeight: 600
+            }}
+          />
+          <Chip 
+            label={`${writingHistory.length} Texts Written`} 
+            color="secondary" 
+            size="small"
+            sx={{ 
+              borderRadius: 0.5,
+              fontSize: '0.75rem',
+              fontWeight: 600
+            }}
+          />
+        </Box>
+      </Box>
 
+      <Grid container spacing={3}>
+        {/* Writing Form */}
+        <Grid item xs={12} lg={8}>
+          <Card sx={{ 
+            borderRadius: 0.5,
+            border: '1px solid #dfe1e6',
+            boxShadow: '0 1px 3px rgba(9, 30, 66, 0.13)'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              {/* Title Input */}
+              <Box sx={{ mb: 3 }}>
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    fontWeight: 600,
+                    color: '#172b4d',
+                    mb: 1,
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  Title (Optional)
+                </Typography>
+                <TextField
+                  fullWidth
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Enter a title for your text..."
+                  variant="outlined"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 0.5,
+                      fontSize: '1rem'
+                    }
+                  }}
+                />
+              </Box>
+
+              {/* Content Input */}
+              <Box sx={{ mb: 3 }}>
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    fontWeight: 600,
+                    color: '#172b4d',
+                    mb: 1,
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  Your Text
+                </Typography>
+                
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={8}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="Write your German text here... (maximum 250 words)"
+                  variant="outlined"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 0.5,
+                      fontSize: '1rem'
+                    }
+                  }}
+                  helperText={
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
+                      <Typography variant="caption" sx={{ color: '#6b778c' }}>
+                        Word count: {wordCount}/250
+                      </Typography>
+                      {wordCount > 250 && (
+                        <Typography variant="caption" sx={{ color: '#d32f2f' }}>
+                          Maximum 250 words allowed
+                        </Typography>
+                      )}
+                    </Box>
+                  }
+                />
+              </Box>
+
+              {/* Submit Button */}
+              <Box sx={{ mb: 3 }}>
                 <Button
                   variant="contained"
                   onClick={handleSubmit}
-                  disabled={!content.trim() || wordCount > 250 || isLoading}
-                  startIcon={isLoading ? <CircularProgress size={16} /> : <Send />}
+                  disabled={isLoading || !content.trim() || wordCount > 250}
+                  startIcon={isLoading ? <CircularProgress size={16} color="inherit" /> : <Send />}
                   sx={{
-                    bgcolor: '#0052cc',
                     borderRadius: 0.5,
                     textTransform: 'none',
-                    fontWeight: 500,
-                    '&:hover': { bgcolor: '#0047b3' },
-                    '&:disabled': { bgcolor: '#dfe1e6' }
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    px: 3,
+                    py: 1.5,
+                    bgcolor: '#0052cc',
+                    '&:hover': {
+                      bgcolor: '#0047b3'
+                    },
+                    '&:disabled': {
+                      bgcolor: '#f4f5f7',
+                      color: '#6b778c'
+                    }
                   }}
                 >
-                  {isLoading ? 'Analyzing...' : 'Submit for Feedback'}
+                  {isLoading ? 'Analyzing...' : 'Get Feedback'}
                 </Button>
+              </Box>
 
-                {feedback && (
-                  <Box sx={{ mt: 3 }}>
-                    <Typography 
-                      variant="h6" 
+              {/* Feedback */}
+              {feedback && (
+                <Alert 
+                  severity="info"
+                  sx={{ 
+                    borderRadius: 0.5,
+                    '& .MuiAlert-message': {
+                      width: '100%'
+                    }
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                    <Edit sx={{ fontSize: 20, mt: 0.25 }} />
+                    <Box sx={{ flex: 1 }}>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          whiteSpace: 'pre-wrap',
+                          fontSize: '0.875rem',
+                          lineHeight: 1.6
+                        }}
+                      >
+                        {feedback}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Writing Tips */}
+        <Grid item xs={12} lg={4}>
+          <Card sx={{ 
+            height: 'fit-content',
+            position: 'sticky',
+            top: 24,
+            borderRadius: 0.5,
+            border: '1px solid #dfe1e6',
+            boxShadow: '0 1px 3px rgba(9, 30, 66, 0.13)'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography 
+                variant="h6" 
+                sx={{ 
+                  fontWeight: 600,
+                  color: '#172b4d',
+                  mb: 2,
+                  fontSize: '1.125rem'
+                }}
+              >
+                Writing Tips
+              </Typography>
+              
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Paper sx={{ p: 2, bgcolor: '#f8f9fa', borderRadius: 0.5 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      fontWeight: 600,
+                      color: '#172b4d',
+                      mb: 1,
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    📝 Structure
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      color: '#6b778c',
+                      fontSize: '0.75rem',
+                      lineHeight: 1.5
+                    }}
+                  >
+                    Start with an introduction, develop your main points, and conclude with a summary.
+                  </Typography>
+                </Paper>
+
+                <Paper sx={{ p: 2, bgcolor: '#f8f9fa', borderRadius: 0.5 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      fontWeight: 600,
+                      color: '#172b4d',
+                      mb: 1,
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    🔤 Grammar
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      color: '#6b778c',
+                      fontSize: '0.75rem',
+                      lineHeight: 1.5
+                    }}
+                  >
+                    Pay attention to verb conjugations, cases, and sentence structure appropriate for your level.
+                  </Typography>
+                </Paper>
+
+                <Paper sx={{ p: 2, bgcolor: '#f8f9fa', borderRadius: 0.5 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      fontWeight: 600,
+                      color: '#172b4d',
+                      mb: 1,
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    📚 Vocabulary
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      color: '#6b778c',
+                      fontSize: '0.75rem',
+                      lineHeight: 1.5
+                    }}
+                  >
+                    Use vocabulary appropriate for your level. Don't be afraid to use simpler words correctly.
+                  </Typography>
+                </Paper>
+
+                <Paper sx={{ p: 2, bgcolor: '#f8f9fa', borderRadius: 0.5 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      fontWeight: 600,
+                      color: '#172b4d',
+                      mb: 1,
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    ⏱️ Length
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      color: '#6b778c',
+                      fontSize: '0.75rem',
+                      lineHeight: 1.5
+                    }}
+                  >
+                    Aim for 50-250 words. Quality over quantity - focus on accuracy and clarity.
+                  </Typography>
+                </Paper>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Writing History */}
+      {writingHistory.length > 0 && (
+        <Box sx={{ mt: 4 }}>
+          <Card sx={{ 
+            borderRadius: 0.5,
+            border: '1px solid #dfe1e6',
+            boxShadow: '0 1px 3px rgba(9, 30, 66, 0.13)'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography 
+                variant="h6" 
+                sx={{ 
+                  fontWeight: 600,
+                  color: '#172b4d',
+                  mb: 2,
+                  fontSize: '1.125rem'
+                }}
+              >
+                Writing History
+              </Typography>
+              
+              <Grid container spacing={2}>
+                {writingHistory.slice(0, 6).map((practice) => (
+                  <Grid item xs={12} sm={6} md={4} key={practice.id}>
+                    <Paper 
                       sx={{ 
-                        fontWeight: 600, 
-                        mb: 2, 
-                        color: '#172b4d',
-                        fontSize: { xs: '1rem', sm: '1.125rem' }
+                        p: 2,
+                        borderRadius: 0.5,
+                        border: '1px solid #e9ecef',
+                        bgcolor: '#f8f9fa',
+                        height: '100%'
                       }}
                     >
-                      AI Feedback
-                    </Typography>
-                    <Paper sx={{ 
-                      bgcolor: '#f8f9fa',
-                      border: '1px solid #dfe1e6',
-                      borderRadius: 0.5
-                    }}>
-                      <Box sx={{ p: { xs: 2, sm: 3 } }}>
-                        <Typography 
-                          variant="body2" 
-                          component="div"
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontWeight: 600,
+                          color: '#172b4d',
+                          mb: 1,
+                          fontSize: '0.875rem'
+                        }}
+                      >
+                        {practice.title || 'Untitled'}
+                      </Typography>
+                      
+                      <Typography 
+                        variant="caption" 
+                        sx={{ 
+                          color: '#6b778c',
+                          fontSize: '0.75rem',
+                          display: 'block',
+                          mb: 1,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {practice.content.substring(0, 100)}...
+                      </Typography>
+                      
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Chip 
+                          label={practice.userLevel} 
+                          size="small"
                           sx={{ 
-                            whiteSpace: 'pre-line',
-                            lineHeight: 1.6,
-                            color: '#172b4d'
+                            fontSize: '0.75rem',
+                            height: 20,
+                            bgcolor: '#e3f2fd',
+                            color: '#1976d2'
+                          }}
+                        />
+                        <Typography 
+                          variant="caption" 
+                          sx={{ 
+                            color: '#6b778c',
+                            fontSize: '0.75rem'
                           }}
                         >
-                          {feedback}
+                          {new Date(practice.createdAt).toLocaleDateString()}
                         </Typography>
                       </Box>
                     </Paper>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Writing History */}
-          <Grid item xs={12} lg={4}>
-            <Card sx={{ 
-              bgcolor: 'white',
-              borderRadius: 0.5,
-              border: '1px solid #dfe1e6',
-              boxShadow: '0 1px 3px rgba(9, 30, 66, 0.13)',
-              '&:hover': {
-                boxShadow: '0 2px 6px rgba(9, 30, 66, 0.15)',
-              }
-            }}>
-              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-                  <History sx={{ color: '#0052cc', fontSize: 20 }} />
-                  <Typography 
-                    variant="h6" 
-                    sx={{ 
-                      fontWeight: 600, 
-                      color: '#172b4d',
-                      fontSize: { xs: '1rem', sm: '1.125rem' }
-                    }}
-                  >
-                    Writing History
-                  </Typography>
-                </Box>
-                
-                {writingHistory.length > 0 ? (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {writingHistory.slice(0, isMobile ? 3 : 5).map((practice) => (
-                      <Paper 
-                        key={practice.id} 
-                        sx={{ 
-                          bgcolor: '#f8f9fa',
-                          border: '1px solid #dfe1e6',
-                          borderRadius: 0.5,
-                          '&:hover': {
-                            bgcolor: '#f1f3f4',
-                          }
-                        }}
-                      >
-                        <Box sx={{ p: 2 }}>
-                          <Typography 
-                            variant="subtitle2" 
-                            sx={{ 
-                              fontWeight: 600, 
-                              color: '#172b4d', 
-                              mb: 1,
-                              fontSize: { xs: '0.875rem', sm: '1rem' }
-                            }}
-                          >
-                            {practice.title || 'Untitled'}
-                          </Typography>
-                          <Typography 
-                            variant="body2" 
-                            color="text.secondary" 
-                            sx={{ 
-                              mb: 1,
-                              fontSize: { xs: '0.75rem', sm: '0.875rem' }
-                            }}
-                          >
-                            {practice.content.length > 100 
-                              ? practice.content.substring(0, 100) + '...' 
-                              : practice.content
-                            }
-                          </Typography>
-                          <Box sx={{ 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            alignItems: 'center',
-                            flexWrap: 'wrap',
-                            gap: 1
-                          }}>
-                            <Chip 
-                              label={`Level ${practice.userLevel}`} 
-                              size="small" 
-                              color="primary"
-                              sx={{ borderRadius: 0.5 }}
-                            />
-                            <Typography 
-                              variant="caption" 
-                              color="text.secondary"
-                              sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
-                            >
-                              {new Date(practice.createdAt).toLocaleDateString()}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </Paper>
-                    ))}
-                  </Box>
-                ) : (
-                  <Box sx={{ 
-                    textAlign: 'center', 
-                    py: 4,
-                    color: '#6b778c'
-                  }}>
-                    <School sx={{ fontSize: 40, color: '#dfe1e6', mb: 1 }} />
-                    <Typography variant="body2" color="text.secondary">
-                      No writing practices yet. Start writing to see your history here!
-                    </Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      </Container>
-    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+            </CardContent>
+          </Card>
+        </Box>
+      )}
+    </Container>
   );
-} 
+}
+*/

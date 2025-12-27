@@ -1,3 +1,5 @@
+// Grammar Practice API Route - Temporarily disabled
+/*
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -72,162 +74,107 @@ export async function POST(request: NextRequest) {
     // Create OpenAI prompt for grammar checking
     const prompt = `You are a German language grammar expert. Your task is to check if the user's input correctly applies the specific grammar rule provided.
 
-GRAMMAR RULE TO CHECK: ${grammarRule.title}
-RULE DESCRIPTION: ${grammarRule.description}
-CORRECT EXAMPLES: ${grammarRule.examples.join(' | ')}
+GRAMMAR RULE TO CHECK: 
+Title: ${grammarRule.title}
+Description: ${grammarRule.description}
+Examples: ${grammarRule.examples.join(', ')}
 
 USER INPUT: "${userInput}"
 
-ANALYSIS INSTRUCTIONS:
-1. Focus ONLY on the specific grammar rule mentioned above
-2. Ignore other grammar aspects not related to this rule
-3. Compare the user input with the provided examples
-4. If the user input correctly applies the grammar rule, mark as CORRECT
-5. Only mark as INCORRECT if the specific rule is violated
+Please analyze the user's input and determine if it correctly follows the grammar rule. Consider:
+1. Does the input follow the grammatical structure described in the rule?
+2. Are the words used correctly according to the rule?
+3. Is the sentence structure appropriate?
 
-RESPONSE FORMAT:
-Status: CORRECT
-OR
-Status: INCORRECT
-Explanation: [brief explanation of the specific rule violation, max 50 words]`;
+Respond with a JSON object containing:
+{
+  "isCorrect": boolean,
+  "feedback": "Brief explanation of why it's correct or what needs to be improved",
+  "suggestions": "Optional suggestions for improvement if incorrect"
+}
 
-    // Call OpenAI API
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: "You are a German grammar expert. You must focus ONLY on the specific grammar rule being tested. Do not check for other grammar aspects. If the user input correctly applies the specific rule, mark it as CORRECT. Be generous in marking correct answers that demonstrate understanding of the rule."
-        },
-        {
-          role: "user",
-          content: prompt
+Be concise but helpful in your feedback.`;
+
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        max_tokens: 200
+      });
+
+      const aiResponse = completion.choices[0]?.message?.content;
+      let parsedResponse;
+      
+      try {
+        parsedResponse = JSON.parse(aiResponse || '{}');
+      } catch (parseError) {
+        // Fallback if JSON parsing fails
+        parsedResponse = {
+          isCorrect: false,
+          feedback: aiResponse || "Unable to analyze the input.",
+          suggestions: "Please try again with a different input."
+        };
+      }
+
+      // Create practice attempt record
+      const attempt = await prisma.grammarPracticeAttempt.create({
+        data: {
+          practiceId: grammarPractice.id,
+          userInput: userInput,
+          isCorrect: parsedResponse.isCorrect,
+          aiFeedback: parsedResponse.feedback,
+          errorMessage: parsedResponse.suggestions
         }
-      ],
-      max_tokens: 150,
-      temperature: 0.1
-    });
+      });
 
-    const aiResponse = completion.choices[0]?.message?.content || '';
-    
-    // Debug: Log the AI response
-    console.log('AI Response for grammar check:', aiResponse);
-    
-    // Parse AI response with fallback
-    let isCorrect = aiResponse.includes('CORRECT');
-    let explanation = null;
-    
-    // If the response doesn't contain CORRECT, check if it's a clear error
-    if (!isCorrect && !aiResponse.includes('INCORRECT')) {
-      // Fallback: if the response is unclear, default to correct for safety
-      console.log('Unclear AI response, defaulting to correct');
-      isCorrect = true;
-    } else if (aiResponse.includes('INCORRECT')) {
-      isCorrect = false;
-      explanation = aiResponse.includes('Explanation:') 
-        ? aiResponse.split('Explanation:')[1]?.trim() || null
-        : 'Grammar rule not applied correctly';
+      // Update practice count and last practiced date
+      await prisma.grammarPractice.update({
+        where: { id: grammarPractice.id },
+        data: {
+          practiceCount: { increment: 1 },
+          lastPracticed: new Date()
+        }
+      });
+
+      return NextResponse.json({
+        success: true,
+        attempt: {
+          id: attempt.id,
+          isCorrect: parsedResponse.isCorrect,
+          feedback: parsedResponse.feedback,
+          suggestions: parsedResponse.suggestions
+        }
+      });
+
+    } catch (openaiError) {
+      console.error('OpenAI API error:', openaiError);
+      
+      // Create attempt record with error
+      const attempt = await prisma.grammarPracticeAttempt.create({
+        data: {
+          practiceId: grammarPractice.id,
+          userInput: userInput,
+          isCorrect: false,
+          errorMessage: "AI service temporarily unavailable. Please try again later."
+        }
+      });
+
+      return NextResponse.json({
+        success: false,
+        error: 'AI service temporarily unavailable',
+        attempt: {
+          id: attempt.id,
+          isCorrect: false,
+          feedback: "AI service temporarily unavailable. Please try again later.",
+          suggestions: "Please try again in a few minutes."
+        }
+      }, { status: 503 });
     }
 
-    // Create practice attempt record
-    const attempt = await prisma.grammarPracticeAttempt.create({
-      data: {
-        practiceId: grammarPractice.id,
-        userInput: userInput.trim(),
-        isCorrect,
-        aiFeedback: aiResponse.length > 100 ? aiResponse.substring(0, 100) + '...' : aiResponse,
-        errorMessage: !isCorrect && explanation ? 
-          (explanation.length > 50 ? explanation.substring(0, 50) + '...' : explanation) : 
-          null
-      }
-    });
-
-    // Update practice record
-    await prisma.grammarPractice.update({
-      where: { id: grammarPractice.id },
-      data: {
-        lastPracticed: new Date(),
-        practiceCount: {
-          increment: 1
-        }
-      }
-    });
-
-    return NextResponse.json({
-      success: true,
-      isCorrect,
-      feedback: aiResponse,
-      errorMessage: !isCorrect ? explanation : null,
-      attempt: {
-        id: attempt.id,
-        userInput: attempt.userInput,
-        isCorrect: attempt.isCorrect,
-        createdAt: attempt.createdAt
-      }
-    });
-
   } catch (error) {
-    console.error('Error in grammar practice:', error);
+    console.error('Grammar practice error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const grammarRuleId = searchParams.get('grammarRuleId');
-
-    if (grammarRuleId) {
-      // Get practice history for specific grammar rule
-      const practice = await prisma.grammarPractice.findUnique({
-        where: {
-          userId_grammarRuleId: {
-            userId: user.id,
-            grammarRuleId: grammarRuleId
-          }
-        },
-        include: {
-          grammarRule: true,
-          attempts: {
-            orderBy: { createdAt: 'desc' },
-            take: 10
-          }
-        }
-      });
-
-      return NextResponse.json(practice);
-    } else {
-      // Get all user's grammar practices
-      const practices = await prisma.grammarPractice.findMany({
-        where: { userId: user.id },
-        include: {
-          grammarRule: true,
-          attempts: {
-            orderBy: { createdAt: 'desc' },
-            take: 5
-          }
-        },
-        orderBy: { lastPracticed: 'desc' }
-      });
-
-      return NextResponse.json(practices);
-    }
-  } catch (error) {
-    console.error('Error fetching grammar practice:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-} 
+*/

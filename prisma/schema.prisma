@@ -102,6 +102,9 @@ model Word {
   level        Int            @default(1)
   nextReview   DateTime?
   reviewCount  Int            @default(0)
+  approvalStatus WordApprovalStatus @default(PENDING)
+  approvedAt   DateTime?
+  approvedBy   String?
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   progress     WordProgress[]
   tags         Tag[]          @relation("WordTags")
@@ -223,4 +226,10 @@ enum SubscriptionStatus {
   INACTIVE
   CANCELLED
   EXPIRED
+}
+
+enum WordApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

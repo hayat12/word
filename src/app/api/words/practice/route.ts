@@ -38,23 +38,34 @@ export async function GET(request: NextRequest) {
 
     // Build the where clause for words
     let whereClause: any = {
-      userId: session.user.id,
+      AND: [
+        {
+          OR: [
+            { userId: session.user.id }, // User's own words
+            { approvalStatus: 'APPROVED' } // All approved words
+          ]
+        }
+      ]
     };
 
     // Exclude recently practiced words
     if (recentlyPracticedWordIds.length > 0) {
-      whereClause.id = {
-        notIn: recentlyPracticedWordIds
-      };
+      whereClause.AND.push({
+        id: {
+          notIn: recentlyPracticedWordIds
+        }
+      });
     }
 
     // Add tag filter if specified
     if (tagId) {
-      whereClause.tags = {
-        some: {
-          id: tagId
+      whereClause.AND.push({
+        tags: {
+          some: {
+            id: tagId
+          }
         }
-      };
+      });
     }
 
     // Fetch words for practice
@@ -80,10 +91,19 @@ export async function GET(request: NextRequest) {
     if (words.length < Math.min(limit, 5) && recentlyPracticedWordIds.length > 0) {
       const additionalWords = await prisma.word.findMany({
         where: {
-          userId: session.user.id,
-          id: {
-            in: recentlyPracticedWordIds
-          }
+          AND: [
+            {
+              OR: [
+                { userId: session.user.id },
+                { approvalStatus: 'APPROVED' }
+              ]
+            },
+            {
+              id: {
+                in: recentlyPracticedWordIds
+              }
+            }
+          ]
         },
         include: {
           tags: {

@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
-// GET /api/words - Get all words for the current user
+// GET /api/words - Get all words accessible to the current user
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -12,9 +12,50 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Get user role to determine what words they can see
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true }
+    });
+
+    let whereClause: any = {};
+
+    if (user?.role === 'ADMIN') {
+      // Admins can see all words (their own + all approved words + pending words for review)
+      whereClause = {
+        OR: [
+          { userId: session.user.id }, // Their own words
+          { approvalStatus: 'APPROVED' }, // All approved words
+          { approvalStatus: 'PENDING' } // Pending words for review
+        ]
+      };
+    } else {
+      // Regular users can see their own words + all approved words
+      whereClause = {
+        OR: [
+          { userId: session.user.id }, // Their own words
+          { approvalStatus: 'APPROVED' } // All approved words
+        ]
+      };
+    }
+
     const words = await prisma.word.findMany({
-      where: {
-        userId: session.user.id,
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        tags: {
+          select: {
+            id: true,
+            name: true,
+            color: true
+          }
+        }
       },
       orderBy: {
         createdAt: 'desc',
@@ -51,6 +92,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get user role to determine approval status
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true }
+    });
+
+    // Admin words are automatically approved, user words need approval
+    const approvalStatus = user?.role === 'ADMIN' ? 'APPROVED' : 'PENDING';
+    const approvedAt = user?.role === 'ADMIN' ? new Date() : null;
+    const approvedBy = user?.role === 'ADMIN' ? session.user.id : null;
+
     const newWord = await prisma.word.create({
       data: {
         word,
@@ -58,6 +110,9 @@ export async function POST(request: NextRequest) {
         example,
         language,
         userId: session.user.id,
+        approvalStatus,
+        approvedAt,
+        approvedBy,
       },
     });
 

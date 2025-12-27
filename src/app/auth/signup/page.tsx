@@ -76,14 +76,14 @@ export default function SignUp() {
       const result = await signIn("credentials", {
         email: formData.email,
         password: formData.password,
-        redirect: false,
+        redirect: true,
+        callbackUrl: "/",
       });
 
+      // If we get here, there was an error (successful login redirects)
       if (result?.error) {
         setError("Account created but failed to sign in. Please try signing in manually.");
         console.error("Sign in error:", result.error);
-      } else if (result?.ok) {
-        router.push("/");
       }
     } catch (error) {
       console.error("Sign up error:", error);
@@ -100,13 +100,12 @@ export default function SignUp() {
     try {
       const result = await signIn("google", {
         callbackUrl: "/",
-        redirect: false,
+        redirect: true,
       });
 
+      // If we get here, there was an error (successful login redirects)
       if (result?.error) {
         setError("Failed to sign up with Google. Please try again.");
-      } else if (result?.ok) {
-        router.push("/");
       }
     } catch (error) {
       setError("An error occurred. Please try again.");

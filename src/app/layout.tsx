@@ -5,8 +5,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import Providers from "@/components/Providers";
 import ThemeToggle from "@/components/ThemeToggle";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import NavbarWrapper from "@/components/NavbarWrapper";
+import FooterWrapper from "@/components/FooterWrapper";
 import { Box } from "@mui/material";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -32,11 +32,11 @@ export default async function RootLayout({
             flexDirection: 'column', 
             minHeight: '100vh' 
           }}>
-            {session && <Navbar />}
+            <NavbarWrapper />
             <Box component="main" sx={{ flex: 1 }}>
               {children}
             </Box>
-            {session && <Footer />}
+            <FooterWrapper />
           </Box>
           <ThemeToggle />
         </Providers>

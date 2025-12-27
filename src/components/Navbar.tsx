@@ -191,7 +191,8 @@ export default function Navbar() {
             }}
           />
         </ListItem>
-        <ListItem 
+        {/* Grammar Practice - Temporarily disabled */}
+        {/* <ListItem 
           component={Link} 
           href="/practice/grammar" 
           onClick={handleDrawerToggle}
@@ -211,8 +212,9 @@ export default function Navbar() {
               }
             }}
           />
-        </ListItem>
-        <ListItem 
+        </ListItem> */}
+        {/* Writing Practice - Temporarily disabled */}
+        {/* <ListItem 
           component={Link} 
           href="/practice/writing" 
           onClick={handleDrawerToggle}
@@ -232,7 +234,7 @@ export default function Navbar() {
               }
             }}
           />
-        </ListItem>
+        </ListItem> */}
         <ListItem 
           component={Link} 
           href="/statistics" 
@@ -320,6 +322,54 @@ export default function Navbar() {
                 }}
               />
             </ListItem>
+            
+            {/* Admin Navigation */}
+            {session.user.role === 'ADMIN' && (
+              <>
+                <ListItem 
+                  component={Link} 
+                  href="/admin/users" 
+                  onClick={handleDrawerToggle}
+                  sx={{ 
+                    color: '#172b4d',
+                    bgcolor: isActive('/admin/users') ? '#f0f7ff' : 'transparent',
+                    borderRight: isActive('/admin/users') ? '3px solid #0052cc' : 'none',
+                    '&:hover': { bgcolor: isActive('/admin/users') ? '#f0f7ff' : '#f4f5f7' }
+                  }}
+                >
+                  <ListItemText 
+                    primary="Manage Users" 
+                    sx={{
+                      '& .MuiTypography-root': {
+                        fontWeight: isActive('/admin/users') ? 600 : 400,
+                        color: isActive('/admin/users') ? '#0052cc' : '#172b4d'
+                      }
+                    }}
+                  />
+                </ListItem>
+                <ListItem 
+                  component={Link} 
+                  href="/admin/words" 
+                  onClick={handleDrawerToggle}
+                  sx={{ 
+                    color: '#172b4d',
+                    bgcolor: isActive('/admin/words') ? '#f0f7ff' : 'transparent',
+                    borderRight: isActive('/admin/words') ? '3px solid #0052cc' : 'none',
+                    '&:hover': { bgcolor: isActive('/admin/words') ? '#f0f7ff' : '#f4f5f7' }
+                  }}
+                >
+                  <ListItemText 
+                    primary="Word Approval" 
+                    sx={{
+                      '& .MuiTypography-root': {
+                        fontWeight: isActive('/admin/words') ? 600 : 400,
+                        color: isActive('/admin/words') ? '#0052cc' : '#172b4d'
+                      }
+                    }}
+                  />
+                </ListItem>
+              </>
+            )}
           </>
         )}
       </List>
@@ -447,7 +497,8 @@ export default function Navbar() {
             >
               Words
             </Button>
-            <Button
+            {/* Grammar Practice - Temporarily disabled */}
+            {/* <Button
               component={Link}
               href="/practice/grammar"
               startIcon={<PlayArrow sx={{ fontSize: '1.125rem' }} />}
@@ -467,8 +518,9 @@ export default function Navbar() {
               }}
             >
               Grammar Practice
-            </Button>
-            <Button
+            </Button> */}
+            {/* Writing Practice - Temporarily disabled */}
+            {/* <Button
               component={Link}
               href="/practice/writing"
               startIcon={<Edit sx={{ fontSize: '1.125rem' }} />}
@@ -488,7 +540,7 @@ export default function Navbar() {
               }}
             >
               Writing Practice
-            </Button>
+            </Button> */}
             <Button
               component={Link}
               href="/statistics"
@@ -650,6 +702,43 @@ export default function Navbar() {
                 >
                   Subscription
                 </MenuItem>
+                
+                {/* Admin Navigation */}
+                {session.user.role === 'ADMIN' && (
+                  <>
+                    <MenuItem 
+                      component={Link} 
+                      href="/admin/users" 
+                      onClick={handleMenuClose}
+                      sx={{ 
+                        color: isActive('/admin/users') ? '#0052cc' : '#172b4d',
+                        bgcolor: isActive('/admin/users') ? '#f0f7ff' : 'transparent',
+                        fontWeight: isActive('/admin/users') ? 600 : 400,
+                        '&:hover': { 
+                          bgcolor: isActive('/admin/users') ? '#e6f3ff' : '#f4f5f7' 
+                        }
+                      }}
+                    >
+                      Manage Users
+                    </MenuItem>
+                    <MenuItem 
+                      component={Link} 
+                      href="/admin/words" 
+                      onClick={handleMenuClose}
+                      sx={{ 
+                        color: isActive('/admin/words') ? '#0052cc' : '#172b4d',
+                        bgcolor: isActive('/admin/words') ? '#f0f7ff' : 'transparent',
+                        fontWeight: isActive('/admin/words') ? 600 : 400,
+                        '&:hover': { 
+                          bgcolor: isActive('/admin/words') ? '#e6f3ff' : '#f4f5f7' 
+                        }
+                      }}
+                    >
+                      Word Approval
+                    </MenuItem>
+                  </>
+                )}
+                
                 <MenuItem 
                   onClick={handleLogout}
                   sx={{ 

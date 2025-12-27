@@ -1,3 +1,5 @@
+// Grammar Practice Page - Temporarily disabled
+/*
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -48,13 +50,17 @@ interface GrammarRule {
 
 interface GrammarPractice {
   id: string;
-  grammarRule: GrammarRule;
-  practiceCount: number;
+  userId: string;
+  grammarRuleId: string;
+  createdAt: string;
   lastPracticed: string | null;
+  practiceCount: number;
   attempts: Array<{
     id: string;
     userInput: string;
     isCorrect: boolean;
+    aiFeedback: string | null;
+    errorMessage: string | null;
     createdAt: string;
   }>;
 }
@@ -120,14 +126,13 @@ export default function GrammarPracticePage() {
     }
   };
 
-  const filterRulesByLevel = (rules: GrammarRule[], currentLevel: string) => {
+  const filterRulesByLevel = (rules: GrammarRule[], currentLevel: string): GrammarRule[] => {
     const levelOrder = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
-    const currentLevelIndex = levelOrder.indexOf(currentLevel);
+    const currentIndex = levelOrder.indexOf(currentLevel);
     
-    // Include rules up to and including the user's current level
     return rules.filter(rule => {
-      const ruleLevelIndex = levelOrder.indexOf(rule.level);
-      return ruleLevelIndex <= currentLevelIndex;
+      const ruleIndex = levelOrder.indexOf(rule.level);
+      return ruleIndex <= currentIndex;
     });
   };
 
@@ -143,8 +148,16 @@ export default function GrammarPracticePage() {
     }
   };
 
-  const handlePractice = async () => {
-    if (!selectedRule || !userInput.trim()) return;
+  const handleRuleSelect = (rule: GrammarRule) => {
+    setSelectedRule(rule);
+    setUserInput('');
+    setFeedback(null);
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedRule || !userInput.trim()) {
+      return;
+    }
 
     setIsLoading(true);
     setFeedback(null);
@@ -157,7 +170,7 @@ export default function GrammarPracticePage() {
         },
         body: JSON.stringify({
           grammarRuleId: selectedRule.id,
-          userInput: userInput.trim(),
+          userInput: userInput.trim()
         }),
       });
 
@@ -165,22 +178,29 @@ export default function GrammarPracticePage() {
 
       if (response.ok) {
         setFeedback({
-          isCorrect: result.isCorrect,
-          message: result.message,
-          errorMessage: result.errorMessage
+          isCorrect: result.attempt.isCorrect,
+          message: result.attempt.feedback,
+          errorMessage: result.attempt.suggestions
         });
+        
+        // Refresh practice history
+        fetchPracticeHistory();
+        
+        // Clear input for next attempt
         setUserInput('');
-        fetchPracticeHistory(); // Refresh history
       } else {
         setFeedback({
           isCorrect: false,
-          message: `Error: ${result.error}`,
+          message: result.error || 'An error occurred',
+          errorMessage: 'Please try again'
         });
       }
     } catch (error) {
+      console.error('Error submitting practice:', error);
       setFeedback({
         isCorrect: false,
         message: 'Network error occurred',
+        errorMessage: 'Please check your connection and try again'
       });
     } finally {
       setIsLoading(false);
@@ -188,373 +208,539 @@ export default function GrammarPracticePage() {
   };
 
   const getLevelColor = (level: string) => {
-    switch (level) {
-      case 'A1': return 'error';
-      case 'A2': return 'warning';
-      case 'B1': return 'info';
-      case 'B2': return 'primary';
-      case 'C1': return 'secondary';
-      case 'C2': return 'success';
-      default: return 'default';
-    }
+    const colors = {
+      A1: '#d32f2f',
+      A2: '#f57c00',
+      B1: '#1976d2',
+      B2: '#388e3c',
+      C1: '#7b1fa2',
+      C2: '#2e7d32'
+    };
+    return colors[level as keyof typeof colors] || '#6b778c';
   };
 
-  const getCategoryColor = (category: string) => {
+  const getCategoryIcon = (category: string) => {
     switch (category.toLowerCase()) {
-      case 'verbs': return 'primary';
-      case 'nouns': return 'secondary';
-      case 'adjectives': return 'success';
-      case 'pronouns': return 'warning';
-      case 'prepositions': return 'info';
-      case 'articles': return 'error';
-      default: return 'default';
+      case 'articles':
+        return <MenuBook />;
+      case 'verb conjugation':
+        return <PlayArrow />;
+      case 'cases':
+        return <MyLocation />;
+      case 'adjectives':
+        return <TrendingUp />;
+      case 'modal verbs':
+        return <School />;
+      case 'past tense':
+        return <Schedule />;
+      default:
+        return <School />;
     }
   };
 
   if (!session) {
     return (
-      <Box sx={{ minHeight: '100vh', bgcolor: '#f4f5f7' }}>
-        <Container maxWidth="sm" sx={{ py: { xs: 2, md: 4 } }}>
-          <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-            <Alert severity="info" sx={{ width: '100%' }}>
-              Please sign in to access grammar practice.
-            </Alert>
-          </Box>
-        </Container>
-      </Box>
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Card>
+          <CardContent sx={{ textAlign: 'center', py: 6 }}>
+            <Typography variant="h5" gutterBottom>
+              Please sign in to access grammar practice
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              You need to be logged in to practice German grammar rules.
+            </Typography>
+          </CardContent>
+        </Card>
+      </Container>
     );
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#f4f5f7' }}>
-      <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
-        
-        {/* Header Section */}
-        <Box sx={{ mb: 4 }}>
-          <Typography 
-            variant="h4" 
-            component="h1" 
-            gutterBottom 
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      {/* Header */}
+      <Box sx={{ mb: 4 }}>
+        <Typography 
+          variant="h4" 
+          sx={{ 
+            fontWeight: 700,
+            color: '#172b4d',
+            mb: 1,
+            fontSize: { xs: '1.75rem', sm: '2.125rem' }
+          }}
+        >
+          Grammar Practice
+        </Typography>
+        <Typography 
+          variant="body1" 
+          sx={{ 
+            color: '#6b778c',
+            fontSize: { xs: '1rem', sm: '1.125rem' }
+          }}
+        >
+          Practice German grammar rules with AI-powered feedback. Choose a rule and create sentences to test your understanding.
+        </Typography>
+        <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <Chip 
+            label={`Current Level: ${userLevel}`} 
+            color="primary" 
+            size="small"
             sx={{ 
-              fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
-              fontWeight: 700, 
-              color: '#172b4d',
-              mb: 1
-            }}
-          >
-            Grammar Practice
-          </Typography>
-          <Typography 
-            variant="body1" 
-            color="text.secondary"
-            sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
-          >
-            Practice German grammar rules with AI-powered feedback - Current Level: {userLevel}
-          </Typography>
-        </Box>
-
-        <Grid container spacing={3}>
-          {/* Grammar Rules List */}
-          <Grid item xs={12} lg={4}>
-            <Card sx={{ 
-              bgcolor: 'white',
               borderRadius: 0.5,
-              border: '1px solid #dfe1e6',
-              boxShadow: '0 1px 3px rgba(9, 30, 66, 0.13)',
-              '&:hover': {
-                boxShadow: '0 2px 6px rgba(9, 30, 66, 0.15)',
-              }
-            }}>
-              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-                  <MenuBook sx={{ color: '#0052cc', fontSize: 20 }} />
-                  <Typography 
-                    variant="h6" 
-                    sx={{ 
-                      fontWeight: 600, 
-                      color: '#172b4d',
-                      fontSize: { xs: '1rem', sm: '1.125rem' }
-                    }}
-                  >
-                    Grammar Rules (Level {userLevel} and below)
-                  </Typography>
-                </Box>
-                <Typography 
-                  variant="body2" 
-                  color="text.secondary" 
-                  sx={{ mb: 3, fontSize: { xs: '0.875rem', sm: '1rem' } }}
-                >
-                  Select a grammar rule to practice
-                </Typography>
-                
-                {grammarRules.length > 0 ? (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {grammarRules.map((rule) => (
-                      <Paper
-                        key={rule.id}
+              fontSize: '0.75rem',
+              fontWeight: 600
+            }}
+          />
+          <Chip 
+            label={`${grammarRules.length} Rules Available`} 
+            color="secondary" 
+            size="small"
+            sx={{ 
+              borderRadius: 0.5,
+              fontSize: '0.75rem',
+              fontWeight: 600
+            }}
+          />
+        </Box>
+      </Box>
+
+      <Grid container spacing={3}>
+        {/* Grammar Rules List */}
+        <Grid item xs={12} lg={4}>
+          <Card sx={{ 
+            height: 'fit-content',
+            position: 'sticky',
+            top: 24,
+            borderRadius: 0.5,
+            border: '1px solid #dfe1e6',
+            boxShadow: '0 1px 3px rgba(9, 30, 66, 0.13)'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography 
+                variant="h6" 
+                sx={{ 
+                  fontWeight: 600,
+                  color: '#172b4d',
+                  mb: 2,
+                  fontSize: '1.125rem'
+                }}
+              >
+                Available Rules
+              </Typography>
+              
+              {grammarRules.length > 0 ? (
+                <List sx={{ p: 0 }}>
+                  {grammarRules.map((rule, index) => (
+                    <Box key={rule.id}>
+                      <ListItem
+                        onClick={() => handleRuleSelect(rule)}
                         sx={{
                           cursor: 'pointer',
-                          border: selectedRule?.id === rule.id ? '2px solid #0052cc' : '1px solid #dfe1e6',
-                          bgcolor: selectedRule?.id === rule.id ? '#f0f7ff' : 'transparent',
                           borderRadius: 0.5,
+                          mb: 1,
+                          bgcolor: selectedRule?.id === rule.id ? '#f0f7ff' : 'transparent',
+                          border: selectedRule?.id === rule.id ? '1px solid #0052cc' : '1px solid transparent',
+                          transition: 'all 0.2s ease',
                           '&:hover': {
-                            borderColor: selectedRule?.id === rule.id ? '#0052cc' : '#0052cc',
-                            bgcolor: selectedRule?.id === rule.id ? '#f0f7ff' : '#f4f5f7'
-                          },
-                          transition: 'all 0.2s ease'
+                            bgcolor: selectedRule?.id === rule.id ? '#e6f3ff' : '#f4f5f7',
+                            borderColor: selectedRule?.id === rule.id ? '#0052cc' : '#dfe1e6'
+                          }
                         }}
-                        onClick={() => setSelectedRule(rule)}
                       >
-                        <Box sx={{ p: 2 }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 1 }}>
+                          <Box sx={{ color: getLevelColor(rule.level) }}>
+                            {getCategoryIcon(rule.category)}
+                          </Box>
+                        </Box>
+                        <ListItemText
+                          primary={
                             <Typography 
-                              variant="subtitle2" 
+                              variant="body2" 
                               sx={{ 
-                                fontWeight: 600, 
-                                color: '#172b4d',
-                                fontSize: { xs: '0.875rem', sm: '1rem' }
+                                fontWeight: selectedRule?.id === rule.id ? 600 : 500,
+                                color: selectedRule?.id === rule.id ? '#0052cc' : '#172b4d',
+                                fontSize: '0.875rem'
                               }}
                             >
                               {rule.title}
                             </Typography>
-                            <Chip
-                              label={`Level ${rule.level}`}
-                              size="small"
-                              color={getLevelColor(rule.level)}
-                              sx={{ 
-                                fontSize: '0.75rem',
-                                borderRadius: 0.5
-                              }}
-                            />
-                          </Box>
-                          <Typography 
-                            variant="body2" 
-                            color="text.secondary" 
-                            sx={{ 
-                              fontSize: { xs: '0.875rem', sm: '1rem' },
-                              mb: 1
-                            }}
-                          >
-                            {rule.description}
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                            <Chip
-                              label={rule.category}
-                              size="small"
-                              color={getCategoryColor(rule.category)}
-                              sx={{ 
-                                fontSize: '0.75rem',
-                                borderRadius: 0.5
-                              }}
-                            />
-                          </Box>
-                        </Box>
-                      </Paper>
-                    ))}
-                  </Box>
-                ) : (
-                  <Box sx={{ textAlign: 'center', py: 4 }}>
-                    <School sx={{ fontSize: 40, color: '#6b778c', mb: 2 }} />
-                    <Typography 
-                      variant="body2" 
-                      color="text.secondary"
-                      sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
-                    >
-                      No grammar rules available for your current level ({userLevel})
-                    </Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Practice Area */}
-          <Grid item xs={12} lg={8}>
-            <Card sx={{ 
-              bgcolor: 'white',
-              borderRadius: 0.5,
-              border: '1px solid #dfe1e6',
-              boxShadow: '0 1px 3px rgba(9, 30, 66, 0.13)',
-              '&:hover': {
-                boxShadow: '0 2px 6px rgba(9, 30, 66, 0.15)',
-              }
-            }}>
-              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-                  <MyLocation sx={{ color: '#0052cc', fontSize: 20 }} />
-                  <Typography 
-                    variant="h6" 
-                    sx={{ 
-                      fontWeight: 600, 
-                      color: '#172b4d',
-                      fontSize: { xs: '1rem', sm: '1.125rem' }
-                    }}
-                  >
-                    Practice Area
-                  </Typography>
-                </Box>
-                <Typography 
-                  variant="body2" 
-                  color="text.secondary" 
-                  sx={{ mb: 3, fontSize: { xs: '0.875rem', sm: '1rem' } }}
-                >
-                  {selectedRule ? `Practice: ${selectedRule.title}` : 'Select a grammar rule to start practicing'}
-                </Typography>
-
-                {selectedRule && (
-                  <>
-                    <Paper sx={{ 
-                      bgcolor: '#f8f9fa', 
-                      mb: 3,
-                      border: '1px solid #dfe1e6',
-                      borderRadius: 0.5
-                    }}>
-                      <Box sx={{ p: { xs: 2, sm: 3 } }}>
-                        <Typography 
-                          variant="subtitle2" 
-                          sx={{ 
-                            fontWeight: 600, 
-                            mb: 2, 
-                            color: '#172b4d',
-                            fontSize: { xs: '0.875rem', sm: '1rem' }
-                          }}
-                        >
-                          Examples:
-                        </Typography>
-                        <List dense sx={{ py: 0 }}>
-                          {selectedRule.examples.map((example, index) => (
-                            <ListItem key={index} sx={{ py: 0.5 }}>
-                              <ListItemText
-                                primary={`• ${example}`}
-                                primaryTypographyProps={{
-                                  variant: 'body2',
-                                  color: 'text.secondary',
-                                  sx: { 
-                                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                                    lineHeight: 1.4
-                                  }
+                          }
+                          secondary={
+                            <Box sx={{ mt: 0.5 }}>
+                              <Chip 
+                                label={rule.level} 
+                                size="small"
+                                sx={{ 
+                                  height: 20,
+                                  fontSize: '0.75rem',
+                                  bgcolor: getLevelColor(rule.level),
+                                  color: 'white',
+                                  fontWeight: 600,
+                                  mr: 1
                                 }}
                               />
-                            </ListItem>
-                          ))}
-                        </List>
-                      </Box>
-                    </Paper>
-
-                    <Box sx={{ mb: 3 }}>
-                      <TextField
-                        fullWidth
-                        multiline
-                        rows={isMobile ? 3 : 4}
-                        label="Your sentence (max 5 words)"
-                        value={userInput}
-                        onChange={(e) => setUserInput(e.target.value)}
-                        placeholder="Write your sentence here..."
-                        variant="outlined"
-                        disabled={isLoading}
-                        inputProps={{ maxLength: 100 }}
-                        sx={{
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: 0.5,
+                              <Typography 
+                                variant="caption" 
+                                sx={{ 
+                                  color: '#6b778c',
+                                  fontSize: '0.75rem'
+                                }}
+                              >
+                                {rule.category}
+                              </Typography>
+                            </Box>
                           }
-                        }}
-                      />
-                      
-                      <Box sx={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'center', 
-                        mt: 1,
-                        flexWrap: 'wrap',
-                        gap: 1
-                      }}>
-                        <Typography variant="caption" color="text.secondary">
-                          Word count: {wordCount}/5
-                        </Typography>
-                        <Chip 
-                          label={`Level ${selectedRule.level}`} 
-                          color={getLevelColor(selectedRule.level)} 
-                          size="small"
-                          sx={{ borderRadius: 0.5 }}
                         />
-                      </Box>
+                      </ListItem>
+                      {index < grammarRules.length - 1 && <Divider sx={{ my: 1 }} />}
                     </Box>
+                  ))}
+                </List>
+              ) : (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <CircularProgress size={40} />
+                  <Typography variant="body2" sx={{ mt: 2, color: '#6b778c' }}>
+                    Loading grammar rules...
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
 
-                    <Button
-                      variant="contained"
-                      onClick={handlePractice}
-                      disabled={!userInput.trim() || wordCount > 5 || isLoading}
-                      startIcon={isLoading ? <CircularProgress size={16} /> : <PlayArrow />}
-                      sx={{
-                        bgcolor: '#0052cc',
-                        borderRadius: 0.5,
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        '&:hover': { bgcolor: '#0047b3' },
-                        '&:disabled': { bgcolor: '#dfe1e6' }
+        {/* Practice Area */}
+        <Grid item xs={12} lg={8}>
+          {selectedRule ? (
+            <Card sx={{ 
+              borderRadius: 0.5,
+              border: '1px solid #dfe1e6',
+              boxShadow: '0 1px 3px rgba(9, 30, 66, 0.13)'
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                {/* Selected Rule Info */}
+                <Box sx={{ mb: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <Box sx={{ color: getLevelColor(selectedRule.level) }}>
+                      {getCategoryIcon(selectedRule.category)}
+                    </Box>
+                    <Typography 
+                      variant="h6" 
+                      sx={{ 
+                        fontWeight: 600,
+                        color: '#172b4d',
+                        fontSize: '1.125rem'
                       }}
                     >
-                      {isLoading ? 'Checking...' : 'Check Grammar'}
-                    </Button>
+                      {selectedRule.title}
+                    </Typography>
+                    <Chip 
+                      label={selectedRule.level} 
+                      size="small"
+                      sx={{ 
+                        height: 24,
+                        fontSize: '0.75rem',
+                        bgcolor: getLevelColor(selectedRule.level),
+                        color: 'white',
+                        fontWeight: 600
+                      }}
+                    />
+                  </Box>
+                  
+                  <Typography 
+                    variant="body1" 
+                    sx={{ 
+                      color: '#172b4d',
+                      mb: 2,
+                      fontSize: '1rem'
+                    }}
+                  >
+                    {selectedRule.description}
+                  </Typography>
 
-                    {feedback && (
-                      <Box sx={{ mt: 3 }}>
-                        <Alert 
-                          severity={feedback.isCorrect ? 'success' : 'error'}
-                          icon={feedback.isCorrect ? <CheckCircle /> : <Cancel />}
-                          sx={{ 
-                            borderRadius: 0.5,
-                            '& .MuiAlert-message': {
-                              color: feedback.isCorrect ? '#2e7d32' : '#d32f2f'
+                  <Box sx={{ mb: 2 }}>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        fontWeight: 600,
+                        color: '#172b4d',
+                        mb: 1,
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      Examples:
+                    </Typography>
+                    <List sx={{ p: 0 }}>
+                      {selectedRule.examples.map((example, index) => (
+                        <ListItem key={index} sx={{ py: 0.5, px: 0 }}>
+                          <ListItemText
+                            primary={
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  color: '#6b778c',
+                                  fontSize: '0.875rem',
+                                  fontStyle: 'italic'
+                                }}
+                              >
+                                {example}
+                              </Typography>
                             }
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                </Box>
+
+                {/* Practice Input */}
+                <Box sx={{ mb: 3 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      fontWeight: 600,
+                      color: '#172b4d',
+                      mb: 1,
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    Create a sentence using this grammar rule:
+                  </Typography>
+                  
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={2}
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    placeholder="Type your sentence here (maximum 5 words)..."
+                    variant="outlined"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 0.5,
+                        fontSize: '1rem'
+                      }
+                    }}
+                    helperText={
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
+                        <Typography variant="caption" sx={{ color: '#6b778c' }}>
+                          Word count: {wordCount}/5
+                        </Typography>
+                        {wordCount > 5 && (
+                          <Typography variant="caption" sx={{ color: '#d32f2f' }}>
+                            Maximum 5 words allowed
+                          </Typography>
+                        )}
+                      </Box>
+                    }
+                  />
+                </Box>
+
+                {/* Submit Button */}
+                <Box sx={{ mb: 3 }}>
+                  <Button
+                    variant="contained"
+                    onClick={handleSubmit}
+                    disabled={isLoading || !userInput.trim() || wordCount > 5}
+                    sx={{
+                      borderRadius: 0.5,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      fontSize: '1rem',
+                      px: 3,
+                      py: 1.5,
+                      bgcolor: '#0052cc',
+                      '&:hover': {
+                        bgcolor: '#0047b3'
+                      },
+                      '&:disabled': {
+                        bgcolor: '#f4f5f7',
+                        color: '#6b778c'
+                      }
+                    }}
+                  >
+                    {isLoading ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CircularProgress size={16} color="inherit" />
+                        Checking...
+                      </Box>
+                    ) : (
+                      'Check My Answer'
+                    )}
+                  </Button>
+                </Box>
+
+                {/* Feedback */}
+                {feedback && (
+                  <Alert 
+                    severity={feedback.isCorrect ? 'success' : 'error'}
+                    sx={{ 
+                      borderRadius: 0.5,
+                      '& .MuiAlert-message': {
+                        width: '100%'
+                      }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                      {feedback.isCorrect ? (
+                        <CheckCircle sx={{ fontSize: 20, mt: 0.25 }} />
+                      ) : (
+                        <Cancel sx={{ fontSize: 20, mt: 0.25 }} />
+                      )}
+                      <Box sx={{ flex: 1 }}>
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            fontWeight: 600,
+                            mb: feedback.errorMessage ? 1 : 0
                           }}
                         >
+                          {feedback.message}
+                        </Typography>
+                        {feedback.errorMessage && (
                           <Typography 
                             variant="body2" 
                             sx={{ 
-                              fontWeight: 500,
-                              fontSize: { xs: '0.875rem', sm: '1rem' }
+                              color: feedback.isCorrect ? 'inherit' : '#d32f2f',
+                              fontSize: '0.875rem'
                             }}
                           >
-                            {feedback.message}
+                            {feedback.errorMessage}
                           </Typography>
-                          {feedback.errorMessage && (
-                            <Typography 
-                              variant="body2" 
-                              sx={{ 
-                                mt: 1,
-                                fontSize: { xs: '0.75rem', sm: '0.875rem' }
-                              }}
-                            >
-                              {feedback.errorMessage}
-                            </Typography>
-                          )}
-                        </Alert>
+                        )}
                       </Box>
-                    )}
-                  </>
-                )}
-
-                {!selectedRule && (
-                  <Box sx={{ 
-                    textAlign: 'center', 
-                    py: 6,
-                    color: '#6b778c'
-                  }}>
-                    <School sx={{ fontSize: 60, color: '#dfe1e6', mb: 2 }} />
-                    <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
-                      Select a grammar rule to start practicing
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Choose from the available rules on the left
-                    </Typography>
-                  </Box>
+                    </Box>
+                  </Alert>
                 )}
               </CardContent>
             </Card>
-          </Grid>
+          ) : (
+            <Card sx={{ 
+              borderRadius: 0.5,
+              border: '1px solid #dfe1e6',
+              boxShadow: '0 1px 3px rgba(9, 30, 66, 0.13)'
+            }}>
+              <CardContent sx={{ textAlign: 'center', py: 6 }}>
+                <School sx={{ fontSize: 60, color: '#6b778c', mb: 2 }} />
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    fontWeight: 600,
+                    color: '#172b4d',
+                    mb: 1
+                  }}
+                >
+                  Select a Grammar Rule
+                </Typography>
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    color: '#6b778c',
+                    maxWidth: 400,
+                    mx: 'auto'
+                  }}
+                >
+                  Choose a grammar rule from the list on the left to start practicing. 
+                  Create sentences and get instant AI feedback on your German grammar.
+                </Typography>
+              </CardContent>
+            </Card>
+          )}
         </Grid>
-      </Container>
-    </Box>
+      </Grid>
+
+      {/* Practice History */}
+      {practiceHistory.length > 0 && (
+        <Box sx={{ mt: 4 }}>
+          <Card sx={{ 
+            borderRadius: 0.5,
+            border: '1px solid #dfe1e6',
+            boxShadow: '0 1px 3px rgba(9, 30, 66, 0.13)'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography 
+                variant="h6" 
+                sx={{ 
+                  fontWeight: 600,
+                  color: '#172b4d',
+                  mb: 2,
+                  fontSize: '1.125rem'
+                }}
+              >
+                Practice History
+              </Typography>
+              
+              <Grid container spacing={2}>
+                {practiceHistory.slice(0, 6).map((practice) => (
+                  <Grid item xs={12} sm={6} md={4} key={practice.id}>
+                    <Paper 
+                      sx={{ 
+                        p: 2,
+                        borderRadius: 0.5,
+                        border: '1px solid #e9ecef',
+                        bgcolor: '#f8f9fa'
+                      }}
+                    >
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontWeight: 600,
+                          color: '#172b4d',
+                          mb: 1,
+                          fontSize: '0.875rem'
+                        }}
+                      >
+                        {practice.attempts.length > 0 ? practice.attempts[0].userInput : 'No attempts yet'}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                        <Chip 
+                          label={`${practice.practiceCount} attempts`} 
+                          size="small"
+                          sx={{ 
+                            fontSize: '0.75rem',
+                            height: 20,
+                            bgcolor: '#e3f2fd',
+                            color: '#1976d2'
+                          }}
+                        />
+                        {practice.lastPracticed && (
+                          <Typography 
+                            variant="caption" 
+                            sx={{ 
+                              color: '#6b778c',
+                              fontSize: '0.75rem'
+                            }}
+                          >
+                            {new Date(practice.lastPracticed).toLocaleDateString()}
+                          </Typography>
+                        )}
+                      </Box>
+                      {practice.attempts.length > 0 && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {practice.attempts[practice.attempts.length - 1].isCorrect ? (
+                            <CheckCircle sx={{ fontSize: 16, color: '#4caf50' }} />
+                          ) : (
+                            <Cancel sx={{ fontSize: 16, color: '#d32f2f' }} />
+                          )}
+                          <Typography 
+                            variant="caption" 
+                            sx={{ 
+                              color: practice.attempts[practice.attempts.length - 1].isCorrect ? '#4caf50' : '#d32f2f',
+                              fontSize: '0.75rem',
+                              fontWeight: 500
+                            }}
+                          >
+                            {practice.attempts[practice.attempts.length - 1].isCorrect ? 'Correct' : 'Incorrect'}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </CardContent>
+          </Card>
+        </Box>
+      )}
+    </Container>
   );
-} 
+}
+*/

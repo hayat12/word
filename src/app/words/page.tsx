@@ -78,6 +78,10 @@ export default function WordsPage() {
   const [loading, setLoading] = useState(true);
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openUploadDialog, setOpenUploadDialog] = useState(false);
+  const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [editingWord, setEditingWord] = useState<Word | null>(null);
+  const [deletingWord, setDeletingWord] = useState<Word | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(isMobile ? 5 : 10);
@@ -169,6 +173,71 @@ export default function WordsPage() {
       }
     } catch (error) {
       setSnackbar({ open: true, message: 'Failed to upload words', severity: 'error' });
+    }
+  };
+
+  const handleEditWord = (word: Word) => {
+    setEditingWord(word);
+    setFormData({
+      word: word.word,
+      translation: word.translation,
+      example: word.example || '',
+      language: word.language
+    });
+    setOpenEditDialog(true);
+  };
+
+  const handleUpdateWord = async () => {
+    if (!editingWord) return;
+
+    try {
+      const response = await fetch(`/api/words/${editingWord.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        setSnackbar({ open: true, message: 'Word updated successfully!', severity: 'success' });
+        setOpenEditDialog(false);
+        setEditingWord(null);
+        setFormData({ word: '', translation: '', example: '', language: 'German' });
+        fetchWords();
+      } else {
+        const error = await response.json();
+        setSnackbar({ open: true, message: error.error || 'Failed to update word', severity: 'error' });
+      }
+    } catch (error) {
+      setSnackbar({ open: true, message: 'Failed to update word', severity: 'error' });
+    }
+  };
+
+  const handleDeleteWord = (word: Word) => {
+    setDeletingWord(word);
+    setOpenDeleteDialog(true);
+  };
+
+  const confirmDeleteWord = async () => {
+    if (!deletingWord) return;
+
+    try {
+      const response = await fetch(`/api/words/${deletingWord.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setSnackbar({ open: true, message: 'Word deleted successfully!', severity: 'success' });
+        setOpenDeleteDialog(false);
+        setDeletingWord(null);
+        fetchWords();
+      } else {
+        const error = await response.json();
+        setSnackbar({ open: true, message: error.error || 'Failed to delete word', severity: 'error' });
+      }
+    } catch (error) {
+      setSnackbar({ open: true, message: 'Failed to delete word', severity: 'error' });
     }
   };
 
@@ -513,12 +582,20 @@ export default function WordsPage() {
                     <TableCell>
                       <Box sx={{ display: 'flex', gap: 1 }}>
                         <Tooltip title="Edit">
-                          <IconButton size="small" sx={{ color: '#0052cc' }}>
+                          <IconButton 
+                            size="small" 
+                            sx={{ color: '#0052cc' }}
+                            onClick={() => handleEditWord(word)}
+                          >
                             <EditIcon />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Delete">
-                          <IconButton size="small" sx={{ color: '#d32f2f' }}>
+                          <IconButton 
+                            size="small" 
+                            sx={{ color: '#d32f2f' }}
+                            onClick={() => handleDeleteWord(word)}
+                          >
                             <DeleteIcon />
                           </IconButton>
                         </Tooltip>
@@ -551,10 +628,8 @@ export default function WordsPage() {
           maxWidth="sm"
           fullWidth
         >
-          <DialogTitle sx={{ pb: 1, borderBottom: '1px solid #dfe1e6' }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, color: '#172b4d' }}>
-              Add New Word
-            </Typography>
+          <DialogTitle sx={{ pb: 1, borderBottom: '1px solid #dfe1e6', fontWeight: 600, color: '#172b4d' }}>
+            Add New Word
           </DialogTitle>
           <DialogContent sx={{ pt: 3 }}>
             <Grid container spacing={2}>
@@ -652,10 +727,8 @@ export default function WordsPage() {
           maxWidth="sm"
           fullWidth
         >
-          <DialogTitle sx={{ pb: 1, borderBottom: '1px solid #dfe1e6' }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, color: '#172b4d' }}>
-              Upload CSV File
-            </Typography>
+          <DialogTitle sx={{ pb: 1, borderBottom: '1px solid #dfe1e6', fontWeight: 600, color: '#172b4d' }}>
+            Upload CSV File
           </DialogTitle>
           <DialogContent sx={{ pt: 3 }}>
             <Grid container spacing={2}>
@@ -730,6 +803,137 @@ export default function WordsPage() {
               }}
             >
               Upload
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Edit Word Dialog */}
+        <Dialog 
+          open={openEditDialog} 
+          onClose={() => setOpenEditDialog(false)}
+          maxWidth="sm" 
+          fullWidth
+        >
+          <DialogTitle sx={{ pb: 1, borderBottom: '1px solid #dfe1e6', fontWeight: 600, color: '#172b4d' }}>
+            Edit Word
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Word"
+                  value={formData.word}
+                  onChange={(e) => setFormData({ ...formData, word: e.target.value })}
+                  variant="outlined"
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Translation"
+                  value={formData.translation}
+                  onChange={(e) => setFormData({ ...formData, translation: e.target.value })}
+                  variant="outlined"
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Example (Optional)"
+                  value={formData.example}
+                  onChange={(e) => setFormData({ ...formData, example: e.target.value })}
+                  variant="outlined"
+                  multiline
+                  rows={2}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Language</InputLabel>
+                  <Select
+                    value={formData.language}
+                    label="Language"
+                    onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                  >
+                    {languages.filter(lang => lang !== 'All').map((lang) => (
+                      <MenuItem key={lang} value={lang}>
+                        {lang}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions sx={{ p: 3, pt: 1 }}>
+            <Button 
+              onClick={() => setOpenEditDialog(false)}
+              sx={{ color: '#6b778c' }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUpdateWord}
+              variant="contained"
+              sx={{ 
+                bgcolor: '#1976d2',
+                '&:hover': { bgcolor: '#1565c0' }
+              }}
+            >
+              Update Word
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog 
+          open={openDeleteDialog} 
+          onClose={() => setOpenDeleteDialog(false)}
+          maxWidth="sm" 
+          fullWidth
+        >
+          <DialogTitle sx={{ pb: 1, borderBottom: '1px solid #dfe1e6', fontWeight: 600, color: '#172b4d' }}>
+            Delete Word
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <Typography variant="body1" sx={{ color: '#6b778c', mb: 2 }}>
+              Are you sure you want to delete this word? This action cannot be undone.
+            </Typography>
+            {deletingWord && (
+              <Paper sx={{ p: 2, bgcolor: '#f8f9fa', border: '1px solid #dfe1e6' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#172b4d' }}>
+                  {deletingWord.word}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#6b778c' }}>
+                  {deletingWord.translation}
+                </Typography>
+                {deletingWord.example && (
+                  <Typography variant="body2" sx={{ color: '#6b778c', fontStyle: 'italic', mt: 1 }}>
+                    "{deletingWord.example}"
+                  </Typography>
+                )}
+              </Paper>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ p: 3, pt: 1 }}>
+            <Button 
+              onClick={() => setOpenDeleteDialog(false)}
+              sx={{ color: '#6b778c' }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={confirmDeleteWord}
+              variant="contained"
+              sx={{ 
+                bgcolor: '#d32f2f',
+                '&:hover': { bgcolor: '#c62828' }
+              }}
+            >
+              Delete Word
             </Button>
           </DialogActions>
         </Dialog>

@@ -72,6 +72,21 @@ export default function WordsTrainingPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Utility function to update URL parameters
+  const updateUrlParams = (updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === '') {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+    });
+    
+    router.push(`/training/words?${params.toString()}`, { scroll: false });
+  };
   const [words, setWords] = useState<Word[]>([]);
   const [filteredWords, setFilteredWords] = useState<Word[]>([]);
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
@@ -92,10 +107,27 @@ export default function WordsTrainingPage() {
     message: '',
     severity: 'success' as 'success' | 'error',
   });
-  const [practiceMode, setPracticeMode] = useState<string>('');
+  const [practiceMode, setPracticeMode] = useState<string>('new-words');
   const [selectedTag, setSelectedTag] = useState<string>('');
+  const [userLevel, setUserLevel] = useState<string>('A1');
+  const [isLoading, setIsLoading] = useState(false);
 
   const languages = ['All', 'English', 'German', 'Spanish'];
+
+  // Helper function to validate practice modes
+  const isValidPracticeMode = (mode: string): boolean => {
+    const validModes = ['new-words', 'mistakes', 'week', '3weeks', 'month', 'all-studied'];
+    return validModes.includes(mode);
+  };
+
+  const practiceModes = [
+    { value: 'new-words', label: 'New Words', description: 'Practice words you haven\'t studied yet' },
+    { value: 'mistakes', label: 'Previous Mistakes', description: 'Review words you got wrong before' },
+    { value: 'week', label: 'Last Week', description: 'Practice words studied in the last week' },
+    { value: '3weeks', label: 'Last 3 Weeks', description: 'Practice words studied in the last 3 weeks' },
+    { value: 'month', label: 'Last Month', description: 'Practice words studied in the last month' },
+    { value: 'all-studied', label: 'All Studied Words', description: 'Random review of all studied words' }
+  ];
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -105,10 +137,23 @@ export default function WordsTrainingPage() {
       return;
     }
 
+    // Fetch user level first
+    fetchUserLevel();
+  }, [session, status]);
+
+  useEffect(() => {
+    if (!userLevel || !session?.user?.id) return;
+
     // Check for URL parameters
     const mode = searchParams.get('mode');
     const wordIds = searchParams.get('words');
     const tagId = searchParams.get('tag');
+    const language = searchParams.get('language');
+
+    // Restore language selection from URL
+    if (language && languages.includes(language)) {
+      setSelectedLanguage(language);
+    }
 
     if (mode && wordIds) {
       setPracticeMode(mode);
@@ -126,10 +171,26 @@ export default function WordsTrainingPage() {
       // Handle grammar practice
       setPracticeMode(mode);
       fetchGrammarWords();
+    } else if (mode && isValidPracticeMode(mode)) {
+      // Set practice mode from URL and fetch words
+      setPracticeMode(mode);
+      // Use the mode from URL for fetching
+      fetchWordsByPracticeModeWithMode(mode);
     } else {
-      fetchWords();
+      // Default to new words practice mode
+      setPracticeMode('new-words');
+      fetchWordsByPracticeModeWithMode('new-words');
     }
-  }, [session, status, searchParams]);
+  }, [userLevel, searchParams, session]);
+
+  const handleLanguageChange = (newLanguage: string) => {
+    setSelectedLanguage(newLanguage);
+    
+    // Update URL parameters
+    updateUrlParams({ 
+      language: newLanguage === 'All' ? null : newLanguage 
+    });
+  };
 
   useEffect(() => {
     // Filter words based on selected language
@@ -143,6 +204,77 @@ export default function WordsTrainingPage() {
     setUserAnswer('');
     setIsCorrect(null);
   }, [words, selectedLanguage]);
+
+  const fetchUserLevel = async () => {
+    try {
+      const response = await fetch('/api/user/preferences');
+      if (response.ok) {
+        const userData = await response.json();
+        setUserLevel(userData.userLevel || 'A1');
+      }
+    } catch (error) {
+      console.error('Error fetching user level:', error);
+      setUserLevel('A1'); // Default fallback
+    }
+  };
+
+  const fetchWordsByPracticeMode = async () => {
+    await fetchWordsByPracticeModeWithMode(practiceMode);
+  };
+
+  const fetchWordsByPracticeModeWithMode = async (mode: string) => {
+    // Check if session is available
+    if (!session?.user?.id) {
+      setSnackbar({
+        open: true,
+        message: 'Please sign in to access words training',
+        severity: 'error',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `/api/words/practice-modes?mode=${mode}&userLevel=${userLevel}&limit=20`,
+        {
+          credentials: 'include', // Ensure cookies are sent
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setWords(data);
+      } else {
+        const errorData = await response.json();
+        throw new Error(`Failed to fetch words: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error fetching words by practice mode:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to load words',
+        severity: 'error',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePracticeModeChange = (newMode: string) => {
+    setPracticeMode(newMode);
+    
+    // Update URL parameters
+    const updates: Record<string, string | null> = { mode: newMode };
+    
+    // Remove tag parameter if switching away from tag-based mode
+    if (!newMode.startsWith('tag-')) {
+      updates.tag = null;
+    }
+    
+    updateUrlParams(updates);
+    fetchWordsByPracticeMode();
+  };
 
   const fetchWords = async () => {
     try {
@@ -411,46 +543,93 @@ export default function WordsTrainingPage() {
       <Box sx={{ maxWidth: 1200, mx: 'auto', px: { xs: 2, sm: 3 } }}>
         {/* Welcome Screen */}
         {!isTraining && (
-          <Box sx={{ textAlign: 'center', py: 8 }}>
-            <Box
-              sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 120,
-                height: 120,
-                borderRadius: '50%',
-                bgcolor: '#1976d2',
-                color: 'white',
-                mb: 4,
-              }}
-            >
-              <SchoolIcon sx={{ fontSize: 60 }} />
-            </Box>
-            <Typography
-              variant="h4"
-              sx={{ fontWeight: 700, color: '#172b4d', mb: 2 }}
-            >
-              Welcome to Words Training!
-            </Typography>
-            <Typography
-              variant="body1"
-              sx={{ color: '#6b778c', mb: 4, maxWidth: 600, mx: 'auto' }}
-            >
-              Practice your vocabulary with interactive flashcards. Test your
-              knowledge and track your progress.
-            </Typography>
-
-            {filteredWords.length > 0 ? (
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 2,
-                }}
+          <Box sx={{ py: 4 }}>
+            <Box sx={{ textAlign: 'center', mb: 3 }}>
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 600, color: '#172b4d', mb: 1 }}
               >
-                <Typography variant="h6" sx={{ color: '#172b4d' }}>
+                Words Training
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ color: '#6b778c', mb: 2 }}
+              >
+                Choose your practice mode and test your knowledge.
+              </Typography>
+            </Box>
+
+            {/* Practice Mode Selection */}
+            <Card sx={{ mb: 4, borderRadius: 2, border: '1px solid #dfe1e6' }}>
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#172b4d', mb: 3 }}>
+                  Choose Practice Mode
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                  <Typography variant="body2" sx={{ color: '#6b778c' }}>
+                    Current Level:
+                  </Typography>
+                  <Chip label={userLevel} size="small" color="primary" sx={{ ml: 1 }} />
+                </Box>
+                
+                <Grid container spacing={2}>
+                  {practiceModes.map((mode) => (
+                    <Grid item xs={12} sm={6} md={4} key={mode.value}>
+                      <Card
+                        onClick={() => handlePracticeModeChange(mode.value)}
+                        sx={{
+                          cursor: 'pointer',
+                          border: practiceMode === mode.value ? '2px solid #1976d2' : '1px solid #dfe1e6',
+                          bgcolor: practiceMode === mode.value ? '#f0f7ff' : 'white',
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            borderColor: '#1976d2',
+                            bgcolor: '#f0f7ff',
+                          },
+                        }}
+                      >
+                        <CardContent sx={{ p: 3 }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#172b4d', mb: 1 }}>
+                            {mode.label}
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#6b778c', fontSize: '0.875rem' }}>
+                            {mode.description}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              </CardContent>
+            </Card>
+
+            {/* Language Filter */}
+            <Card sx={{ mb: 4, borderRadius: 2, border: '1px solid #dfe1e6' }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#172b4d', mb: 2 }}>
+                  Language Filter
+                </Typography>
+                <FormControl fullWidth>
+                  <InputLabel>Select Language</InputLabel>
+                  <Select
+                    value={selectedLanguage}
+                    label="Select Language"
+                    onChange={(e) => handleLanguageChange(e.target.value)}
+                  >
+                    {languages.map((lang) => (
+                      <MenuItem key={lang} value={lang}>
+                        {lang}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </CardContent>
+            </Card>
+
+            {/* Start Training Section */}
+            {filteredWords.length > 0 ? (
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="h6" sx={{ color: '#172b4d', mb: 2 }}>
                   {filteredWords.length} words ready for practice
                 </Typography>
                 <Button
@@ -458,6 +637,7 @@ export default function WordsTrainingPage() {
                   size="large"
                   startIcon={<PlayIcon />}
                   onClick={startTraining}
+                  disabled={isLoading}
                   sx={{
                     bgcolor: '#1976d2',
                     px: 4,
@@ -468,12 +648,12 @@ export default function WordsTrainingPage() {
                     },
                   }}
                 >
-                  Start Training
+                  {isLoading ? 'Loading...' : 'Start Training'}
                 </Button>
               </Box>
             ) : (
               <Alert severity="info" sx={{ maxWidth: 600, mx: 'auto' }}>
-                No words available for training. Please add some words first.
+                No words available for the selected practice mode. Try a different mode or add some words first.
               </Alert>
             )}
           </Box>

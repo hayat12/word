@@ -11,18 +11,24 @@ export default function ThemeToggle() {
 
   useEffect(() => {
     setMounted(true);
-    const savedTheme = localStorage.getItem("theme");
-    setIsDark(savedTheme === "dark");
+    // Only access localStorage after component mounts to prevent hydration mismatch
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem("theme");
+      setIsDark(savedTheme === "dark");
+    }
   }, []);
 
   const handleToggle = () => {
     const newTheme = isDark ? "light" : "dark";
     setIsDark(!isDark);
-    localStorage.setItem("theme", newTheme);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem("theme", newTheme);
+    }
     // You can implement theme switching logic here
     // For now, we'll just toggle the state
   };
 
+  // Prevent hydration mismatch by not rendering until mounted
   if (!mounted) return null;
 
   return (
