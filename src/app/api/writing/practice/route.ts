@@ -1,5 +1,5 @@
-// Writing Practice API Route - Temporarily disabled
-/*
+// Writing Practice API Route
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -13,7 +13,7 @@ const openai = new OpenAI({
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     // Check if user level is B1 or above
     const allowedLevels = ['B1', 'B2', 'C1', 'C2'];
     if (!allowedLevels.includes(user.userLevel)) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Writing practice is only available for B1 level and above',
         currentLevel: user.userLevel,
         requiredLevel: 'B1'
@@ -47,9 +47,9 @@ export async function POST(request: NextRequest) {
     // Check word count (max 250 words)
     const wordCount = content.trim().split(/\s+/).length;
     if (wordCount > 250) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Content too long. Maximum 250 words allowed.',
-        wordCount 
+        wordCount
       }, { status: 400 });
     }
 
@@ -92,10 +92,10 @@ Be encouraging but honest in your assessment.`;
 
       const aiResponse = completion.choices[0]?.message?.content;
       let parsedResponse;
-      
+
       try {
         parsedResponse = JSON.parse(aiResponse || '{}');
-      } catch (parseError) {
+      } catch {
         // Fallback if JSON parsing fails
         parsedResponse = {
           overallScore: 5,
@@ -116,15 +116,8 @@ Be encouraging but honest in your assessment.`;
           title: title || 'Untitled',
           content: content,
           language: language,
-          level: user.userLevel,
-          overallScore: parsedResponse.overallScore,
-          grammarScore: parsedResponse.grammarScore,
-          vocabularyScore: parsedResponse.vocabularyScore,
-          structureScore: parsedResponse.structureScore,
-          aiFeedback: parsedResponse.feedback,
-          strengths: parsedResponse.strengths,
-          improvements: parsedResponse.improvements,
-          isLevelAppropriate: parsedResponse.levelAppropriate
+          userLevel: user.userLevel,
+          aiFeedback: parsedResponse.feedback
         }
       });
 
@@ -145,7 +138,7 @@ Be encouraging but honest in your assessment.`;
 
     } catch (openaiError) {
       console.error('OpenAI API error:', openaiError);
-      
+
       return NextResponse.json({
         success: false,
         error: 'AI service temporarily unavailable',
@@ -158,4 +151,3 @@ Be encouraging but honest in your assessment.`;
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-*/

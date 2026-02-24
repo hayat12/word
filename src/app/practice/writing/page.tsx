@@ -1,5 +1,5 @@
 // Writing Practice Page - Temporarily disabled
-/*
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -587,4 +587,3 @@ export default function WritingPracticePage() {
     </Container>
   );
 }
-*/

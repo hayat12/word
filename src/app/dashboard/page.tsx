@@ -152,6 +152,34 @@ export default function Dashboard() {
   const [levelProgress, setLevelProgress] = useState<LevelProgress | null>(null);
 
   const handlePracticeMode = async (mode: PracticeMode) => {
+    // Level cards: change the user's current level instead of navigating away
+    if (mode.id.startsWith('level-')) {
+      const newLevel = mode.id.replace('level-', '').toUpperCase();
+
+      // If already at this level, do nothing
+      if (newLevel === userLevel) return;
+
+      try {
+        const response = await fetch('/api/user/preferences', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userLevel: newLevel }),
+        });
+
+        if (response.ok) {
+          const updated = await response.json();
+          setUserLevel(updated.userLevel || newLevel);
+        }
+      } catch (error) {
+        console.error('Error updating user level:', error);
+      }
+
+      return;
+    }
+
+    // Other practice modes (not currently used in this component)
     if (mode.id === 'grammar') {
       router.push('/practice/grammar');
     } else if (mode.id === 'writing') {
@@ -498,8 +526,7 @@ export default function Dashboard() {
                   </Typography>
 
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {/* Grammar Practice Requirement - Temporarily disabled */}
-                    {/* <Box sx={{ 
+                    <Box sx={{ 
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'space-between',
@@ -578,7 +605,7 @@ export default function Dashboard() {
                       >
                         Practice Now
                       </Button>
-                    </Box> */}
+                    </Box>
 
                     {/* Vocabulary Practice Requirement */}
                     <Box sx={{ 
@@ -662,8 +689,7 @@ export default function Dashboard() {
                       </Button>
                     </Box>
 
-                    {/* Writing Practice Requirement (for B1+) - Temporarily disabled */}
-                    {/* {['B1', 'B2', 'C1', 'C2'].includes(userLevel) && (
+                    {['B1', 'B2', 'C1', 'C2'].includes(userLevel) && (
                       <Box sx={{ 
                         display: 'flex', 
                         alignItems: 'center', 
@@ -744,7 +770,7 @@ export default function Dashboard() {
                           Write Now
                         </Button>
                       </Box>
-                    )} */}
+                    )}
 
                     {/* Daily Goal Requirement */}
                     <Box sx={{ 
@@ -896,13 +922,19 @@ export default function Dashboard() {
             }}>
               {allLevels.map((mode) => {
                 const isFreeUser = !session.user.subscription || session.user.subscription?.plan === 'FREE';
+                const levelOrder = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+                const currentIndex = levelOrder.indexOf(userLevel);
+                const modeLevel = mode.id.replace('level-', '').toUpperCase();
+                const modeIndex = levelOrder.indexOf(modeLevel);
+
+                const isFutureLevel = modeIndex > currentIndex;
                 const isRestricted = isFreeUser && !mode.isCompleted && !mode.isCurrentLevel && !['level-a1', 'level-a2'].includes(mode.id);
-                const isFutureLevel = !mode.isCompleted && !mode.isCurrentLevel;
-                
+                const isLocked = isFutureLevel || isRestricted;
+
                 return (
                   <Card 
                     key={mode.id}
-                    onClick={isRestricted || isFutureLevel ? undefined : () => handlePracticeMode(mode)}
+                    onClick={isLocked ? undefined : () => handlePracticeMode(mode)}
                     sx={{ 
                       borderRadius: 0.5,
                       bgcolor: isFutureLevel ? '#f8f9fa' : 'white',
@@ -913,12 +945,12 @@ export default function Dashboard() {
                       minHeight: { xs: '160px', sm: '180px', md: '200px' },
                       border: mode.isCurrentLevel ? '2px solid #1976d2' : '1px solid #dfe1e6',
                       boxShadow: '0 1px 3px rgba(9, 30, 66, 0.13)',
-                      cursor: isRestricted || isFutureLevel ? 'default' : 'pointer',
+                      cursor: isLocked ? 'default' : 'pointer',
                       opacity: isFutureLevel ? 0.6 : 1,
                       '&:hover': {
-                        transform: isRestricted || isFutureLevel ? 'none' : 'translateY(-2px)',
-                        boxShadow: isRestricted || isFutureLevel ? '0 1px 3px rgba(9, 30, 66, 0.13)' : '0 4px 12px rgba(9, 30, 66, 0.15)',
-                        borderColor: isRestricted || isFutureLevel ? '#dfe1e6' : mode.isCurrentLevel ? '#1976d2' : '#0052cc',
+                        transform: isLocked ? 'none' : 'translateY(-2px)',
+                        boxShadow: isLocked ? '0 1px 3px rgba(9, 30, 66, 0.13)' : '0 4px 12px rgba(9, 30, 66, 0.15)',
+                        borderColor: isLocked ? '#dfe1e6' : mode.isCurrentLevel ? '#1976d2' : '#0052cc',
                       },
                       '&::before': {
                         content: '""',
@@ -932,7 +964,7 @@ export default function Dashboard() {
                       }
                     }}
                   >
-                    {(isRestricted || isFutureLevel) && (
+                    {isLocked && (
                       <Box sx={{
                         position: 'absolute',
                         top: 0,
@@ -1089,8 +1121,7 @@ export default function Dashboard() {
                 >
                   Begin with A1 level to unlock your language learning progress!
                 </Typography>
-                {/* Start Learning Button - Temporarily disabled */}
-                {/* <Button
+                <Button
                   variant="contained"
                   onClick={() => router.push('/practice/grammar')}
                   sx={{ 
@@ -1100,7 +1131,7 @@ export default function Dashboard() {
                   }}
                 >
                   Start Learning
-                </Button> */}
+                </Button>
               </Box>
             </Card>
           )}

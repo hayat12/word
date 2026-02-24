@@ -1,5 +1,5 @@
 // Grammar Practice API Route - Temporarily disabled
-/*
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -177,4 +177,3 @@ Be concise but helpful in your feedback.`;
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-*/

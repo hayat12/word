@@ -16,8 +16,7 @@ import {
   Chip,
   Menu,
   MenuItem,
-  useTheme,
-  useMediaQuery
+  useTheme
 } from '@mui/material';
 import { 
   Menu as MenuIcon, 
@@ -40,7 +39,6 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const pathname = usePathname();
 
   const handleDrawerToggle = () => {
@@ -192,7 +190,7 @@ export default function Navbar() {
           />
         </ListItem>
         {/* Grammar Practice - Temporarily disabled */}
-        {/* <ListItem 
+        <ListItem 
           component={Link} 
           href="/practice/grammar" 
           onClick={handleDrawerToggle}
@@ -212,9 +210,9 @@ export default function Navbar() {
               }
             }}
           />
-        </ListItem> */}
+        </ListItem>
         {/* Writing Practice - Temporarily disabled */}
-        {/* <ListItem 
+        <ListItem 
           component={Link} 
           href="/practice/writing" 
           onClick={handleDrawerToggle}
@@ -234,7 +232,7 @@ export default function Navbar() {
               }
             }}
           />
-        </ListItem> */}
+        </ListItem>
         <ListItem 
           component={Link} 
           href="/statistics" 
@@ -497,8 +495,7 @@ export default function Navbar() {
             >
               Words
             </Button>
-            {/* Grammar Practice - Temporarily disabled */}
-            {/* <Button
+            <Button
               component={Link}
               href="/practice/grammar"
               startIcon={<PlayArrow sx={{ fontSize: '1.125rem' }} />}
@@ -518,9 +515,8 @@ export default function Navbar() {
               }}
             >
               Grammar Practice
-            </Button> */}
-            {/* Writing Practice - Temporarily disabled */}
-            {/* <Button
+            </Button>
+            <Button
               component={Link}
               href="/practice/writing"
               startIcon={<Edit sx={{ fontSize: '1.125rem' }} />}
@@ -540,7 +536,7 @@ export default function Navbar() {
               }}
             >
               Writing Practice
-            </Button> */}
+            </Button>
             <Button
               component={Link}
               href="/statistics"

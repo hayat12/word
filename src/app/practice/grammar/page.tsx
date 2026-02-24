@@ -1,5 +1,5 @@
 // Grammar Practice Page - Temporarily disabled
-/*
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -72,6 +72,8 @@ export default function GrammarPracticePage() {
   const isTablet = useMediaQuery(theme.breakpoints.down('lg'));
   
   const [grammarRules, setGrammarRules] = useState<GrammarRule[]>([]);
+  const [isRulesLoading, setIsRulesLoading] = useState<boolean>(true);
+  const [rulesError, setRulesError] = useState<string | null>(null);
   const [selectedRule, setSelectedRule] = useState<GrammarRule | null>(null);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -114,16 +116,50 @@ export default function GrammarPracticePage() {
 
   const fetchGrammarRules = async () => {
     try {
+      setIsRulesLoading(true);
+      setRulesError(null);
       const response = await fetch('/api/grammar/rules');
       if (response.ok) {
         const rules = await response.json();
         // Filter rules based on user's current level
         const filteredRules = filterRulesByLevel(rules, userLevel);
         setGrammarRules(filteredRules);
+      } else {
+        const result = await response.json().catch(() => ({}));
+        setRulesError(result.error || 'Unable to load grammar rules.');
+        setGrammarRules([]);
       }
     } catch (error) {
       console.error('Error fetching grammar rules:', error);
+      setRulesError('Network error while loading grammar rules.');
+      setGrammarRules([]);
+    } finally {
+      setIsRulesLoading(false);
     }
+  };
+
+  const normalizeRuleLevel = (level: string | number): string => {
+    // Map numeric levels from the DB to CEFR-style levels
+    const numeric = Number(level);
+    if (!Number.isNaN(numeric)) {
+      switch (numeric) {
+        case 1:
+          return 'A1';
+        case 2:
+          return 'A2';
+        case 3:
+          return 'B1';
+        case 4:
+          return 'B2';
+        case 5:
+          return 'C1';
+        case 6:
+          return 'C2';
+        default:
+          return 'A1';
+      }
+    }
+    return level as string;
   };
 
   const filterRulesByLevel = (rules: GrammarRule[], currentLevel: string): GrammarRule[] => {
@@ -131,7 +167,8 @@ export default function GrammarPracticePage() {
     const currentIndex = levelOrder.indexOf(currentLevel);
     
     return rules.filter(rule => {
-      const ruleIndex = levelOrder.indexOf(rule.level);
+      const normalizedLevel = normalizeRuleLevel(rule.level);
+      const ruleIndex = levelOrder.indexOf(normalizedLevel);
       return ruleIndex <= currentIndex;
     });
   };
@@ -327,7 +364,23 @@ export default function GrammarPracticePage() {
                 Available Rules
               </Typography>
               
-              {grammarRules.length > 0 ? (
+              {isRulesLoading ? (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <CircularProgress size={40} />
+                  <Typography variant="body2" sx={{ mt: 2, color: '#6b778c' }}>
+                    Loading grammar rules...
+                  </Typography>
+                </Box>
+              ) : rulesError ? (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Typography variant="body2" sx={{ mb: 1, color: '#d32f2f' }}>
+                    {rulesError}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#6b778c' }}>
+                    Please try again later or contact the administrator.
+                  </Typography>
+                </Box>
+              ) : grammarRules.length > 0 ? (
                 <List sx={{ p: 0 }}>
                   {grammarRules.map((rule, index) => (
                     <Box key={rule.id}>
@@ -397,9 +450,8 @@ export default function GrammarPracticePage() {
                 </List>
               ) : (
                 <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <CircularProgress size={40} />
-                  <Typography variant="body2" sx={{ mt: 2, color: '#6b778c' }}>
-                    Loading grammar rules...
+                  <Typography variant="body2" sx={{ color: '#6b778c' }}>
+                    No grammar rules available yet for your level.
                   </Typography>
                 </Box>
               )}
@@ -743,4 +795,3 @@ export default function GrammarPracticePage() {
     </Container>
   );
 }
-*/
